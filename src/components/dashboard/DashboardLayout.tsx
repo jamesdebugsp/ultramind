@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 const sidebarLinks = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
@@ -38,10 +39,19 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { signOut, user } = useAuth();
 
-  const handleLogout = () => {
-    navigate("/");
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/login");
   };
+
+  // Get user initials for avatar
+  const userInitials = user?.user_metadata?.name 
+    ? user.user_metadata.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+    : user?.email?.slice(0, 2).toUpperCase() || "US";
+
+  const userName = user?.user_metadata?.name || user?.email?.split("@")[0] || "Usuário";
 
   return (
     <div className="min-h-screen bg-background">
@@ -121,11 +131,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           <div className="p-4 border-t border-border">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full gradient-accent flex items-center justify-center text-primary-foreground font-bold">
-                SP
+                {userInitials}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-foreground text-sm truncate">Salão Premium</p>
-                <p className="text-xs text-muted-foreground truncate">Plano Profissional</p>
+                <p className="font-semibold text-foreground text-sm truncate">{userName}</p>
+                <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
               </div>
             </div>
             <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground" onClick={handleLogout}>
