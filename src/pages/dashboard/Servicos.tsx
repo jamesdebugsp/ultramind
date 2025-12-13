@@ -7,7 +7,8 @@ import {
   DollarSign,
   MoreVertical,
   Edit,
-  Trash2
+  Trash2,
+  Loader2
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,90 +29,81 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useToast } from "@/hooks/use-toast";
-
-interface Servico {
-  id: string;
-  name: string;
-  duration: number;
-  price: number;
-  active: boolean;
-}
-
-const initialServicos: Servico[] = [
-  { id: "1", name: "Corte Feminino", duration: 60, price: 80, active: true },
-  { id: "2", name: "Corte Masculino", duration: 30, price: 45, active: true },
-  { id: "3", name: "Escova", duration: 45, price: 50, active: true },
-  { id: "4", name: "Coloração", duration: 120, price: 180, active: true },
-  { id: "5", name: "Manicure", duration: 45, price: 35, active: true },
-  { id: "6", name: "Pedicure", duration: 60, price: 45, active: true },
-  { id: "7", name: "Barba", duration: 30, price: 30, active: true },
-  { id: "8", name: "Hidratação", duration: 60, price: 70, active: false },
-];
+import { useServices, Service } from "@/hooks/useServices";
 
 export default function Servicos() {
-  const [servicos, setServicos] = useState<Servico[]>(initialServicos);
+  const { services, loading, createService, updateService, deleteService } = useServices();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingServico, setEditingServico] = useState<Servico | null>(null);
-  const [formData, setFormData] = useState({ name: "", duration: "", price: "" });
-  const { toast } = useToast();
+  const [editingServico, setEditingServico] = useState<Service | null>(null);
+  const [formData, setFormData] = useState({ name: "", duration: "", price: "", description: "" });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
     if (editingServico) {
-      setServicos(servicos.map(s => 
-        s.id === editingServico.id 
-          ? { ...s, name: formData.name, duration: Number(formData.duration), price: Number(formData.price) }
-          : s
-      ));
-      toast({ title: "Serviço atualizado!", description: "As alterações foram salvas." });
+      await updateService(editingServico.id, { 
+        name: formData.name, 
+        duration: Number(formData.duration), 
+        price: Number(formData.price),
+        description: formData.description || null
+      });
     } else {
-      const newServico: Servico = {
-        id: Date.now().toString(),
+      await createService({
         name: formData.name,
         duration: Number(formData.duration),
         price: Number(formData.price),
-        active: true
-      };
-      setServicos([...servicos, newServico]);
-      toast({ title: "Serviço adicionado!", description: "Novo serviço cadastrado com sucesso." });
+        description: formData.description || null,
+        status: 'active'
+      });
     }
     
-    setFormData({ name: "", duration: "", price: "" });
+    setFormData({ name: "", duration: "", price: "", description: "" });
     setEditingServico(null);
     setIsDialogOpen(false);
+    setIsSubmitting(false);
   };
 
-  const handleEdit = (servico: Servico) => {
+  const handleEdit = (servico: Service) => {
     setEditingServico(servico);
     setFormData({ 
       name: servico.name, 
       duration: servico.duration.toString(), 
-      price: servico.price.toString() 
+      price: servico.price.toString(),
+      description: servico.description || ""
     });
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setServicos(servicos.filter(s => s.id !== id));
-    toast({ title: "Serviço removido", description: "O serviço foi excluído." });
+  const handleDelete = async (id: string) => {
+    await deleteService(id);
   };
 
-  const toggleActive = (id: string) => {
-    setServicos(servicos.map(s => 
-      s.id === id ? { ...s, active: !s.active } : s
-    ));
+  const toggleActive = async (servico: Service) => {
+    await updateService(servico.id, { 
+      status: servico.status === 'active' ? 'inactive' : 'active' 
+    });
   };
 
   const openNewDialog = () => {
     setEditingServico(null);
-    setFormData({ name: "", duration: "", price: "" });
+    setFormData({ name: "", duration: "", price: "", description: "" });
     setIsDialogOpen(true);
   };
 
-  const activeServicos = servicos.filter(s => s.active);
+  const activeServicos = services.filter(s => s.status === 'active');
   const totalRevenue = activeServicos.reduce((acc, s) => acc + s.price, 0);
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-full">
+          <Loader2 className="w-8 h-8 animate-spin text-highlight" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -154,6 +146,15 @@ export default function Servicos() {
                     required
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Descrição (opcional)</Label>
+                  <Input
+                    id="description"
+                    placeholder="Breve descrição do serviço"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  />
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="duration">Duração (min)</Label>
@@ -182,8 +183,8 @@ export default function Servicos() {
                   <Button type="button" variant="outline" className="flex-1" onClick={() => setIsDialogOpen(false)}>
                     Cancelar
                   </Button>
-                  <Button type="submit" variant="hero" className="flex-1">
-                    {editingServico ? "Salvar" : "Adicionar"}
+                  <Button type="submit" variant="hero" className="flex-1" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : editingServico ? "Salvar" : "Adicionar"}
                   </Button>
                 </div>
               </form>
@@ -204,7 +205,7 @@ export default function Servicos() {
                 <Scissors className="w-5 h-5 text-highlight" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{servicos.length}</p>
+                <p className="text-2xl font-bold text-foreground">{services.length}</p>
                 <p className="text-sm text-muted-foreground">Total</p>
               </div>
             </div>
@@ -255,59 +256,73 @@ export default function Servicos() {
           transition={{ delay: 0.2 }}
           className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
         >
-          {servicos.map((servico) => (
-            <Card 
-              key={servico.id} 
-              variant="elevated" 
-              className={`p-4 ${!servico.active ? 'opacity-60' : ''}`}
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 rounded-lg gradient-accent flex items-center justify-center">
-                  <Scissors className="w-6 h-6 text-primary-foreground" />
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleEdit(servico)}>
-                      <Edit className="w-4 h-4 mr-2" />
-                      Editar
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => toggleActive(servico.id)}>
-                      {servico.active ? "Desativar" : "Ativar"}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => handleDelete(servico.id)}
-                      className="text-destructive"
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Excluir
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-              
-              <h3 className="font-semibold text-foreground mb-2">{servico.name}</h3>
-              
-              <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
-                <div className="flex items-center gap-1">
-                  <Clock className="w-4 h-4" />
-                  {servico.duration}min
-                </div>
-                <div className="flex items-center gap-1">
-                  <DollarSign className="w-4 h-4" />
-                  R${servico.price}
-                </div>
-              </div>
-              
-              <Badge variant={servico.active ? "highlight" : "secondary"}>
-                {servico.active ? "Ativo" : "Inativo"}
-              </Badge>
+          {services.length === 0 ? (
+            <Card variant="elevated" className="col-span-full p-8 text-center">
+              <Scissors className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground mb-4">Nenhum serviço cadastrado</p>
+              <Button variant="hero" onClick={openNewDialog}>
+                <Plus className="w-4 h-4 mr-2" />
+                Adicionar primeiro serviço
+              </Button>
             </Card>
-          ))}
+          ) : (
+            services.map((servico) => (
+              <Card 
+                key={servico.id} 
+                variant="elevated" 
+                className={`p-4 ${servico.status !== 'active' ? 'opacity-60' : ''}`}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div className="w-12 h-12 rounded-lg gradient-accent flex items-center justify-center">
+                    <Scissors className="w-6 h-6 text-primary-foreground" />
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleEdit(servico)}>
+                        <Edit className="w-4 h-4 mr-2" />
+                        Editar
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => toggleActive(servico)}>
+                        {servico.status === 'active' ? "Desativar" : "Ativar"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => handleDelete(servico.id)}
+                        className="text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Excluir
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                
+                <h3 className="font-semibold text-foreground mb-2">{servico.name}</h3>
+                {servico.description && (
+                  <p className="text-sm text-muted-foreground mb-2 line-clamp-2">{servico.description}</p>
+                )}
+                
+                <div className="flex items-center gap-4 text-sm text-muted-foreground mb-3">
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-4 h-4" />
+                    {servico.duration}min
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <DollarSign className="w-4 h-4" />
+                    R${servico.price}
+                  </div>
+                </div>
+                
+                <Badge variant={servico.status === 'active' ? "highlight" : "secondary"}>
+                  {servico.status === 'active' ? "Ativo" : "Inativo"}
+                </Badge>
+              </Card>
+            ))
+          )}
         </motion.div>
       </div>
     </DashboardLayout>

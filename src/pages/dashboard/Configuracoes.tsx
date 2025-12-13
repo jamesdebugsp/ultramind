@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   Settings, 
@@ -10,7 +10,7 @@ import {
   CreditCard,
   Bell,
   Shield,
-  Palette
+  Loader2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,36 +20,82 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { useToast } from "@/hooks/use-toast";
+import { useProfile } from "@/hooks/useProfile";
+import { useSettings } from "@/hooks/useSettings";
 
 export default function Configuracoes() {
+  const { profile, loading: profileLoading, updateProfile } = useProfile();
+  const { settings, loading: settingsLoading, updateSettings } = useSettings();
+  const [isSaving, setIsSaving] = useState(false);
+  
   const [formData, setFormData] = useState({
-    businessName: "Salão Premium",
-    whatsapp: "(11) 99999-0000",
-    instagram: "@salaopremium",
-    address: "Rua das Flores, 123 - Centro, São Paulo - SP",
-    description: "O melhor salão de beleza da região, com profissionais qualificados e ambiente aconchegante.",
+    business_name: "",
+    whatsapp: "",
+    instagram: "",
+    address: "",
+    description: "",
   });
 
   const [notifications, setNotifications] = useState({
-    newAppointment: true,
-    reminder24h: true,
-    reminder1h: true,
-    cancellation: true,
+    send_reminders: true,
+    auto_confirm: false,
   });
 
-  const { toast } = useToast();
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        business_name: profile.business_name || "",
+        whatsapp: profile.whatsapp || "",
+        instagram: profile.instagram || "",
+        address: profile.address || "",
+        description: profile.description || "",
+      });
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    if (settings) {
+      setNotifications({
+        send_reminders: settings.send_reminders ?? true,
+        auto_confirm: settings.auto_confirm ?? false,
+      });
+    }
+  }, [settings]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSave = () => {
-    toast({
-      title: "Configurações salvas!",
-      description: "Suas alterações foram aplicadas com sucesso.",
+  const handleSave = async () => {
+    setIsSaving(true);
+    
+    await updateProfile({
+      business_name: formData.business_name || null,
+      whatsapp: formData.whatsapp || null,
+      instagram: formData.instagram || null,
+      address: formData.address || null,
+      description: formData.description || null,
     });
+    
+    await updateSettings({
+      send_reminders: notifications.send_reminders,
+      auto_confirm: notifications.auto_confirm,
+    });
+    
+    setIsSaving(false);
   };
+
+  const loading = profileLoading || settingsLoading;
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-full">
+          <Loader2 className="w-8 h-8 animate-spin text-highlight" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -68,8 +114,12 @@ export default function Configuracoes() {
               Gerencie as configurações do seu estabelecimento
             </p>
           </div>
-          <Button variant="hero" onClick={handleSave}>
-            <Save className="w-4 h-4 mr-2" />
+          <Button variant="hero" onClick={handleSave} disabled={isSaving}>
+            {isSaving ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Save className="w-4 h-4 mr-2" />
+            )}
             Salvar Alterações
           </Button>
         </motion.div>
@@ -94,12 +144,13 @@ export default function Configuracoes() {
 
               <div className="grid gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="businessName">Nome do estabelecimento</Label>
+                  <Label htmlFor="business_name">Nome do estabelecimento</Label>
                   <Input
-                    id="businessName"
-                    name="businessName"
-                    value={formData.businessName}
+                    id="business_name"
+                    name="business_name"
+                    value={formData.business_name}
                     onChange={handleChange}
+                    placeholder="Nome do seu negócio"
                   />
                 </div>
 
@@ -114,6 +165,7 @@ export default function Configuracoes() {
                         value={formData.whatsapp}
                         onChange={handleChange}
                         className="pl-10"
+                        placeholder="(11) 99999-9999"
                       />
                     </div>
                   </div>
@@ -127,6 +179,7 @@ export default function Configuracoes() {
                         value={formData.instagram}
                         onChange={handleChange}
                         className="pl-10"
+                        placeholder="@seunegocio"
                       />
                     </div>
                   </div>
@@ -142,6 +195,7 @@ export default function Configuracoes() {
                       value={formData.address}
                       onChange={handleChange}
                       className="pl-10 min-h-[80px]"
+                      placeholder="Endereço completo"
                     />
                   </div>
                 </div>
@@ -154,6 +208,7 @@ export default function Configuracoes() {
                     value={formData.description}
                     onChange={handleChange}
                     rows={3}
+                    placeholder="Breve descrição do seu negócio"
                   />
                 </div>
               </div>
@@ -173,49 +228,29 @@ export default function Configuracoes() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground">Notificações</h3>
-                  <p className="text-sm text-muted-foreground">Configure quais notificações deseja receber</p>
+                  <p className="text-sm text-muted-foreground">Configure as notificações automáticas</p>
                 </div>
               </div>
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                   <div>
-                    <p className="font-medium text-foreground">Novo agendamento</p>
-                    <p className="text-sm text-muted-foreground">Receber notificação de novos agendamentos</p>
+                    <p className="font-medium text-foreground">Enviar lembretes</p>
+                    <p className="text-sm text-muted-foreground">Enviar lembrete antes dos agendamentos</p>
                   </div>
                   <Switch
-                    checked={notifications.newAppointment}
-                    onCheckedChange={(checked) => setNotifications({ ...notifications, newAppointment: checked })}
+                    checked={notifications.send_reminders}
+                    onCheckedChange={(checked) => setNotifications({ ...notifications, send_reminders: checked })}
                   />
                 </div>
                 <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                   <div>
-                    <p className="font-medium text-foreground">Lembrete 24h</p>
-                    <p className="text-sm text-muted-foreground">Enviar lembrete 24h antes do agendamento</p>
+                    <p className="font-medium text-foreground">Auto-confirmar agendamentos</p>
+                    <p className="text-sm text-muted-foreground">Confirmar automaticamente novos agendamentos</p>
                   </div>
                   <Switch
-                    checked={notifications.reminder24h}
-                    onCheckedChange={(checked) => setNotifications({ ...notifications, reminder24h: checked })}
-                  />
-                </div>
-                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                  <div>
-                    <p className="font-medium text-foreground">Lembrete 1h</p>
-                    <p className="text-sm text-muted-foreground">Enviar lembrete 1h antes do agendamento</p>
-                  </div>
-                  <Switch
-                    checked={notifications.reminder1h}
-                    onCheckedChange={(checked) => setNotifications({ ...notifications, reminder1h: checked })}
-                  />
-                </div>
-                <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                  <div>
-                    <p className="font-medium text-foreground">Cancelamento</p>
-                    <p className="text-sm text-muted-foreground">Receber notificação de cancelamentos</p>
-                  </div>
-                  <Switch
-                    checked={notifications.cancellation}
-                    onCheckedChange={(checked) => setNotifications({ ...notifications, cancellation: checked })}
+                    checked={notifications.auto_confirm}
+                    onCheckedChange={(checked) => setNotifications({ ...notifications, auto_confirm: checked })}
                   />
                 </div>
               </div>
@@ -242,13 +277,13 @@ export default function Configuracoes() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-highlight/5 rounded-lg border border-highlight/20">
                 <div className="mb-4 sm:mb-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <p className="font-semibold text-foreground">Plano Profissional</p>
+                    <p className="font-semibold text-foreground">Plano Gratuito</p>
                     <Badge variant="highlight">Ativo</Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground">R$99/mês • Próxima cobrança: 15/01/2025</p>
+                  <p className="text-sm text-muted-foreground">Funcionalidades básicas incluídas</p>
                 </div>
                 <Button variant="outline">
-                  Alterar Plano
+                  Fazer Upgrade
                 </Button>
               </div>
             </Card>
