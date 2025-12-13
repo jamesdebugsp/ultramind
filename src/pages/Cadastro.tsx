@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Calendar, Mail, Lock, Eye, EyeOff, ArrowRight, User, Phone } from "lucide-react";
@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Cadastro() {
   const [formData, setFormData] = useState({
@@ -20,6 +21,14 @@ export default function Cadastro() {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { signUp, user, loading } = useAuth();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!loading && user) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [user, loading, navigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -37,18 +46,61 @@ export default function Cadastro() {
       return;
     }
 
+    if (formData.password.length < 6) {
+      toast({
+        title: "Erro",
+        description: "A senha deve ter pelo menos 6 caracteres",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
-    // Simulate registration - Replace with actual auth
-    setTimeout(() => {
+    const { error } = await signUp(formData.email, formData.password, {
+      name: formData.name,
+      phone: formData.phone,
+    });
+
+    if (error) {
       setIsLoading(false);
+      let errorMessage = "Erro ao criar conta. Tente novamente.";
+      
+      if (error.message.includes("User already registered")) {
+        errorMessage = "Este email já está cadastrado. Tente fazer login.";
+      } else if (error.message.includes("Password")) {
+        errorMessage = "A senha deve ter pelo menos 6 caracteres.";
+      } else if (error.message.includes("Invalid email")) {
+        errorMessage = "Por favor, insira um email válido.";
+      }
+      
       toast({
-        title: "Conta criada com sucesso!",
-        description: "Vamos configurar seu estabelecimento...",
+        title: "Erro no cadastro",
+        description: errorMessage,
+        variant: "destructive",
       });
-      navigate("/onboarding");
-    }, 1500);
+      return;
+    }
+
+    setIsLoading(false);
+    toast({
+      title: "Conta criada com sucesso!",
+      description: "Vamos configurar seu estabelecimento...",
+    });
+    navigate("/onboarding");
   };
+
+  // Show nothing while checking auth state
+  if (loading) {
+    return (
+      <div className="min-h-screen gradient-hero flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-highlight border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen gradient-hero flex items-center justify-center p-4 py-12">

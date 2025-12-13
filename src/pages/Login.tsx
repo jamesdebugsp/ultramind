@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Calendar, Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -15,21 +16,61 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { signIn, user, loading } = useAuth();
+
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/dashboard";
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!loading && user) {
+      navigate(from, { replace: true });
+    }
+  }, [user, loading, navigate, from]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate login - Replace with actual auth
-    setTimeout(() => {
+    const { error } = await signIn(email, password);
+
+    if (error) {
       setIsLoading(false);
+      let errorMessage = "Erro ao fazer login. Tente novamente.";
+      
+      if (error.message.includes("Invalid login credentials")) {
+        errorMessage = "Email ou senha incorretos.";
+      } else if (error.message.includes("Email not confirmed")) {
+        errorMessage = "Por favor, confirme seu email antes de fazer login.";
+      }
+      
       toast({
-        title: "Login realizado!",
-        description: "Redirecionando para o painel...",
+        title: "Erro no login",
+        description: errorMessage,
+        variant: "destructive",
       });
-      navigate("/dashboard");
-    }, 1500);
+      return;
+    }
+
+    toast({
+      title: "Login realizado!",
+      description: "Redirecionando para o painel...",
+    });
+    
+    navigate(from, { replace: true });
   };
+
+  // Show nothing while checking auth state
+  if (loading) {
+    return (
+      <div className="min-h-screen gradient-hero flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-highlight border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen gradient-hero flex items-center justify-center p-4">
@@ -101,9 +142,9 @@ export default function Login() {
                 <input type="checkbox" className="rounded border-border" />
                 <span className="text-muted-foreground">Lembrar-me</span>
               </label>
-              <a href="#" className="text-sm text-highlight hover:underline">
+              <Link to="/recuperar-senha" className="text-sm text-highlight hover:underline">
                 Esqueceu a senha?
-              </a>
+              </Link>
             </div>
 
             <Button type="submit" variant="hero" size="lg" className="w-full" disabled={isLoading}>
