@@ -11,12 +11,13 @@ import {
   Edit,
   Trash2,
   MessageSquare,
-  X
+  Loader2
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import {
@@ -32,78 +33,61 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useToast } from "@/hooks/use-toast";
-
-interface Cliente {
-  id: string;
-  name: string;
-  phone: string;
-  email: string;
-  appointments: number;
-  lastVisit: string;
-  status: "ativo" | "inativo";
-}
-
-const initialClientes: Cliente[] = [
-  { id: "1", name: "Maria Silva", phone: "(11) 99999-1111", email: "maria@email.com", appointments: 12, lastVisit: "10/12/2024", status: "ativo" },
-  { id: "2", name: "João Santos", phone: "(11) 99999-2222", email: "joao@email.com", appointments: 8, lastVisit: "08/12/2024", status: "ativo" },
-  { id: "3", name: "Ana Costa", phone: "(11) 99999-3333", email: "ana@email.com", appointments: 5, lastVisit: "01/12/2024", status: "ativo" },
-  { id: "4", name: "Pedro Lima", phone: "(11) 99999-4444", email: "pedro@email.com", appointments: 3, lastVisit: "15/11/2024", status: "inativo" },
-  { id: "5", name: "Carla Souza", phone: "(11) 99999-5555", email: "carla@email.com", appointments: 15, lastVisit: "11/12/2024", status: "ativo" },
-];
+import { useClients, Client } from "@/hooks/useClients";
 
 export default function Clientes() {
-  const [clientes, setClientes] = useState<Cliente[]>(initialClientes);
+  const { clients, loading, createClient, updateClient, deleteClient } = useClients();
   const [searchTerm, setSearchTerm] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
-  const [formData, setFormData] = useState({ name: "", phone: "", email: "" });
-  const { toast } = useToast();
+  const [editingCliente, setEditingCliente] = useState<Client | null>(null);
+  const [formData, setFormData] = useState({ name: "", whatsapp: "", email: "", notes: "" });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const filteredClientes = clientes.filter(cliente =>
+  const filteredClientes = clients.filter(cliente =>
     cliente.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cliente.phone.includes(searchTerm) ||
-    cliente.email.toLowerCase().includes(searchTerm.toLowerCase())
+    (cliente.whatsapp && cliente.whatsapp.includes(searchTerm)) ||
+    (cliente.email && cliente.email.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
     
     if (editingCliente) {
-      setClientes(clientes.map(c => 
-        c.id === editingCliente.id 
-          ? { ...c, name: formData.name, phone: formData.phone, email: formData.email }
-          : c
-      ));
-      toast({ title: "Cliente atualizado!", description: "Os dados foram salvos com sucesso." });
+      await updateClient(editingCliente.id, { 
+        name: formData.name, 
+        whatsapp: formData.whatsapp || null, 
+        email: formData.email || null,
+        notes: formData.notes || null
+      });
     } else {
-      const newCliente: Cliente = {
-        id: Date.now().toString(),
+      await createClient({
         name: formData.name,
-        phone: formData.phone,
-        email: formData.email,
-        appointments: 0,
-        lastVisit: "-",
-        status: "ativo"
-      };
-      setClientes([...clientes, newCliente]);
-      toast({ title: "Cliente adicionado!", description: "Novo cliente cadastrado com sucesso." });
+        whatsapp: formData.whatsapp || null,
+        email: formData.email || null,
+        notes: formData.notes || null
+      });
     }
     
-    setFormData({ name: "", phone: "", email: "" });
+    setFormData({ name: "", whatsapp: "", email: "", notes: "" });
     setEditingCliente(null);
     setIsDialogOpen(false);
+    setIsSubmitting(false);
   };
 
-  const handleEdit = (cliente: Cliente) => {
+  const handleEdit = (cliente: Client) => {
     setEditingCliente(cliente);
-    setFormData({ name: cliente.name, phone: cliente.phone, email: cliente.email });
+    setFormData({ 
+      name: cliente.name, 
+      whatsapp: cliente.whatsapp || "", 
+      email: cliente.email || "",
+      notes: cliente.notes || ""
+    });
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setClientes(clientes.filter(c => c.id !== id));
-    toast({ title: "Cliente removido", description: "O cliente foi excluído da lista." });
+  const handleDelete = async (id: string) => {
+    await deleteClient(id);
   };
 
   const handleWhatsApp = (phone: string) => {
@@ -113,9 +97,19 @@ export default function Clientes() {
 
   const openNewClientDialog = () => {
     setEditingCliente(null);
-    setFormData({ name: "", phone: "", email: "" });
+    setFormData({ name: "", whatsapp: "", email: "", notes: "" });
     setIsDialogOpen(true);
   };
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-full">
+          <Loader2 className="w-8 h-8 animate-spin text-highlight" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -159,13 +153,12 @@ export default function Clientes() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="phone">WhatsApp</Label>
+                  <Label htmlFor="whatsapp">WhatsApp</Label>
                   <Input
-                    id="phone"
+                    id="whatsapp"
                     placeholder="(11) 99999-9999"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    required
+                    value={formData.whatsapp}
+                    onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
@@ -178,12 +171,22 @@ export default function Clientes() {
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Observações</Label>
+                  <Textarea
+                    id="notes"
+                    placeholder="Informações adicionais sobre o cliente"
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    rows={3}
+                  />
+                </div>
                 <div className="flex gap-3 pt-4">
                   <Button type="button" variant="outline" className="flex-1" onClick={() => setIsDialogOpen(false)}>
                     Cancelar
                   </Button>
-                  <Button type="submit" variant="hero" className="flex-1">
-                    {editingCliente ? "Salvar" : "Adicionar"}
+                  <Button type="submit" variant="hero" className="flex-1" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : editingCliente ? "Salvar" : "Adicionar"}
                   </Button>
                 </div>
               </form>
@@ -222,7 +225,7 @@ export default function Clientes() {
                 <Users className="w-5 h-5 text-highlight" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-foreground">{clientes.length}</p>
+                <p className="text-2xl font-bold text-foreground">{clients.length}</p>
                 <p className="text-sm text-muted-foreground">Total</p>
               </div>
             </div>
@@ -230,39 +233,43 @@ export default function Clientes() {
           <Card variant="elevated" className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                <Users className="w-5 h-5 text-emerald-600" />
+                <Phone className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">
-                  {clientes.filter(c => c.status === "ativo").length}
+                  {clients.filter(c => c.whatsapp).length}
                 </p>
-                <p className="text-sm text-muted-foreground">Ativos</p>
+                <p className="text-sm text-muted-foreground">Com WhatsApp</p>
               </div>
             </div>
           </Card>
           <Card variant="elevated" className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-amber-600" />
+                <Mail className="w-5 h-5 text-amber-600" />
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">
-                  {clientes.reduce((acc, c) => acc + c.appointments, 0)}
+                  {clients.filter(c => c.email).length}
                 </p>
-                <p className="text-sm text-muted-foreground">Agendamentos</p>
+                <p className="text-sm text-muted-foreground">Com Email</p>
               </div>
             </div>
           </Card>
           <Card variant="elevated" className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                <Users className="w-5 h-5 text-purple-600" />
+                <Calendar className="w-5 h-5 text-purple-600" />
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">
-                  {clientes.filter(c => c.appointments >= 5).length}
+                  {clients.filter(c => {
+                    const created = new Date(c.created_at);
+                    const now = new Date();
+                    return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear();
+                  }).length}
                 </p>
-                <p className="text-sm text-muted-foreground">Recorrentes</p>
+                <p className="text-sm text-muted-foreground">Novos este mês</p>
               </div>
             </div>
           </Card>
@@ -282,9 +289,7 @@ export default function Clientes() {
                     <tr className="border-b border-border">
                       <th className="text-left p-4 font-medium text-muted-foreground">Cliente</th>
                       <th className="text-left p-4 font-medium text-muted-foreground hidden sm:table-cell">Contato</th>
-                      <th className="text-left p-4 font-medium text-muted-foreground hidden md:table-cell">Agendamentos</th>
-                      <th className="text-left p-4 font-medium text-muted-foreground hidden lg:table-cell">Última Visita</th>
-                      <th className="text-left p-4 font-medium text-muted-foreground">Status</th>
+                      <th className="text-left p-4 font-medium text-muted-foreground hidden lg:table-cell">Observações</th>
                       <th className="text-right p-4 font-medium text-muted-foreground">Ações</th>
                     </tr>
                   </thead>
@@ -294,36 +299,37 @@ export default function Clientes() {
                         <td className="p-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full gradient-accent flex items-center justify-center text-primary-foreground text-sm font-bold">
-                              {cliente.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                              {cliente.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
                             </div>
                             <div>
                               <p className="font-medium text-foreground">{cliente.name}</p>
-                              <p className="text-sm text-muted-foreground sm:hidden">{cliente.phone}</p>
+                              <p className="text-sm text-muted-foreground sm:hidden">{cliente.whatsapp || '-'}</p>
                             </div>
                           </div>
                         </td>
                         <td className="p-4 hidden sm:table-cell">
                           <div className="space-y-1">
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Phone className="w-4 h-4" />
-                              {cliente.phone}
-                            </div>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Mail className="w-4 h-4" />
-                              {cliente.email}
-                            </div>
+                            {cliente.whatsapp && (
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Phone className="w-4 h-4" />
+                                {cliente.whatsapp}
+                              </div>
+                            )}
+                            {cliente.email && (
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Mail className="w-4 h-4" />
+                                {cliente.email}
+                              </div>
+                            )}
+                            {!cliente.whatsapp && !cliente.email && (
+                              <span className="text-sm text-muted-foreground">-</span>
+                            )}
                           </div>
                         </td>
-                        <td className="p-4 hidden md:table-cell">
-                          <span className="font-medium text-foreground">{cliente.appointments}</span>
-                        </td>
                         <td className="p-4 hidden lg:table-cell">
-                          <span className="text-muted-foreground">{cliente.lastVisit}</span>
-                        </td>
-                        <td className="p-4">
-                          <Badge variant={cliente.status === "ativo" ? "highlight" : "secondary"}>
-                            {cliente.status}
-                          </Badge>
+                          <span className="text-sm text-muted-foreground line-clamp-2">
+                            {cliente.notes || '-'}
+                          </span>
                         </td>
                         <td className="p-4 text-right">
                           <DropdownMenu>
@@ -333,10 +339,12 @@ export default function Clientes() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleWhatsApp(cliente.phone)}>
-                                <MessageSquare className="w-4 h-4 mr-2" />
-                                WhatsApp
-                              </DropdownMenuItem>
+                              {cliente.whatsapp && (
+                                <DropdownMenuItem onClick={() => handleWhatsApp(cliente.whatsapp!)}>
+                                  <MessageSquare className="w-4 h-4 mr-2" />
+                                  WhatsApp
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => handleEdit(cliente)}>
                                 <Edit className="w-4 h-4 mr-2" />
                                 Editar
@@ -357,8 +365,17 @@ export default function Clientes() {
                 </table>
               </div>
               {filteredClientes.length === 0 && (
-                <div className="p-8 text-center text-muted-foreground">
-                  Nenhum cliente encontrado
+                <div className="p-8 text-center">
+                  <Users className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-4">
+                    {searchTerm ? "Nenhum cliente encontrado" : "Nenhum cliente cadastrado"}
+                  </p>
+                  {!searchTerm && (
+                    <Button variant="hero" onClick={openNewClientDialog}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Adicionar primeiro cliente
+                    </Button>
+                  )}
                 </div>
               )}
             </CardContent>

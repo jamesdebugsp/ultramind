@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
@@ -10,7 +10,8 @@ import {
   Instagram, 
   CheckCircle2,
   ArrowLeft,
-  ArrowRight
+  ArrowRight,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,27 +19,23 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
-// Mock data - would come from API
-const businessData = {
-  name: "Salão Premium",
-  address: "Rua das Flores, 123 - Centro, São Paulo",
-  whatsapp: "5511999999999",
-  instagram: "salaopremium",
-  services: [
-    { id: 1, name: "Corte Feminino", duration: 45, price: 80 },
-    { id: 2, name: "Corte Masculino", duration: 30, price: 50 },
-    { id: 3, name: "Escova", duration: 40, price: 60 },
-    { id: 4, name: "Coloração", duration: 120, price: 180 },
-    { id: 5, name: "Manicure", duration: 45, price: 40 },
-    { id: 6, name: "Pedicure", duration: 50, price: 50 },
-  ],
-  professionals: [
-    { id: 1, name: "Ana", role: "Cabeleireira" },
-    { id: 2, name: "Carlos", role: "Barbeiro" },
-    { id: 3, name: "Fernanda", role: "Manicure" },
-  ],
-};
+interface BusinessData {
+  id: string;
+  user_id: string;
+  business_name: string;
+  address: string | null;
+  whatsapp: string | null;
+  instagram: string | null;
+}
+
+interface ServiceData {
+  id: string;
+  name: string;
+  duration: number;
+  price: number;
+}
 
 const availableTimes = [
   "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
@@ -48,31 +45,98 @@ const availableTimes = [
 export default function PublicBooking() {
   const { slug } = useParams();
   const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [businessData, setBusinessData] = useState<BusinessData | null>(null);
+  const [services, setServices] = useState<ServiceData[]>([]);
   const [step, setStep] = useState(1);
-  const [selectedService, setSelectedService] = useState<number | null>(null);
-  const [selectedProfessional, setSelectedProfessional] = useState<number | null>(null);
+  const [selectedService, setSelectedService] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
   const [clientData, setClientData] = useState({ name: "", phone: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
 
-  const service = businessData.services.find((s) => s.id === selectedService);
-  const professional = businessData.professionals.find((p) => p.id === selectedProfessional);
+  useEffect(() => {
+    loadBusinessData();
+  }, [slug]);
+
+  const loadBusinessData = async () => {
+    try {
+      // Search for the business by slug (business_name converted to slug)
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .not('business_name', 'is', null);
+
+      if (profileError) throw profileError;
+
+      // Find matching profile by slug
+      const matchingProfile = profiles?.find(p => {
+        const profileSlug = p.business_name
+          ?.toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "");
+        return profileSlug === slug;
+      });
+
+      if (matchingProfile) {
+        setBusinessData(matchingProfile as BusinessData);
+        
+        // Load services for this business
+        const { data: servicesData, error: servicesError } = await supabase
+          .from('services')
+          .select('id, name, duration, price')
+          .eq('user_id', matchingProfile.user_id)
+          .eq('status', 'active');
+
+        if (servicesError) throw servicesError;
+        setServices(servicesData || []);
+      }
+    } catch (error) {
+      console.error('Error loading business data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const service = services.find((s) => s.id === selectedService);
 
   const handleSubmit = async () => {
+    if (!businessData || !selectedService) return;
+    
     setIsSubmitting(true);
     
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    
-    setIsSubmitting(false);
-    setIsConfirmed(true);
-    
-    toast({
-      title: "Agendamento confirmado! 🎉",
-      description: "Você receberá uma confirmação no WhatsApp.",
-    });
+    try {
+      const { error } = await supabase
+        .from('appointments')
+        .insert({
+          user_id: businessData.user_id,
+          client_name: clientData.name,
+          client_whatsapp: clientData.phone || null,
+          service_id: selectedService,
+          date: selectedDate,
+          time: selectedTime,
+          status: 'pending'
+        });
+
+      if (error) throw error;
+      
+      setIsConfirmed(true);
+      toast({
+        title: "Agendamento confirmado! 🎉",
+        description: "Você receberá uma confirmação em breve.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao agendar",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const nextStep = () => {
@@ -80,25 +144,42 @@ export default function PublicBooking() {
       toast({ title: "Selecione um serviço", variant: "destructive" });
       return;
     }
-    if (step === 2 && !selectedProfessional) {
-      toast({ title: "Selecione um profissional", variant: "destructive" });
-      return;
-    }
-    if (step === 3 && (!selectedDate || !selectedTime)) {
+    if (step === 2 && (!selectedDate || !selectedTime)) {
       toast({ title: "Selecione data e horário", variant: "destructive" });
       return;
     }
-    if (step === 4 && (!clientData.name || !clientData.phone)) {
+    if (step === 3 && (!clientData.name || !clientData.phone)) {
       toast({ title: "Preencha seus dados", variant: "destructive" });
       return;
     }
     
-    if (step === 4) {
+    if (step === 3) {
       handleSubmit();
     } else {
       setStep(step + 1);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen gradient-hero flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-highlight" />
+      </div>
+    );
+  }
+
+  if (!businessData) {
+    return (
+      <div className="min-h-screen gradient-hero flex items-center justify-center p-4">
+        <Card variant="elevated" className="p-8 text-center max-w-md">
+          <h1 className="text-2xl font-bold text-foreground mb-4">Página não encontrada</h1>
+          <p className="text-muted-foreground">
+            Este estabelecimento não existe ou ainda não configurou sua página de agendamentos.
+          </p>
+        </Card>
+      </div>
+    );
+  }
 
   if (isConfirmed) {
     return (
@@ -119,10 +200,6 @@ export default function PublicBooking() {
                 <span className="font-medium text-foreground">{service?.name}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Profissional:</span>
-                <span className="font-medium text-foreground">{professional?.name}</span>
-              </div>
-              <div className="flex justify-between">
                 <span className="text-muted-foreground">Data:</span>
                 <span className="font-medium text-foreground">
                   {new Date(selectedDate).toLocaleDateString("pt-BR")}
@@ -135,17 +212,19 @@ export default function PublicBooking() {
             </div>
           </Card>
           <p className="text-muted-foreground mb-6">
-            Você receberá uma confirmação no WhatsApp em instantes.
+            O estabelecimento entrará em contato para confirmar seu agendamento.
           </p>
-          <Button variant="hero" size="lg" asChild>
-            <a
-              href={`https://api.whatsapp.com/send?phone=${businessData.whatsapp}&text=Olá! Acabei de agendar um horário.`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Falar no WhatsApp
-            </a>
-          </Button>
+          {businessData.whatsapp && (
+            <Button variant="hero" size="lg" asChild>
+              <a
+                href={`https://api.whatsapp.com/send?phone=55${businessData.whatsapp.replace(/\D/g, '')}&text=Olá! Acabei de agendar um horário.`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Falar no WhatsApp
+              </a>
+            </Button>
+          )}
         </motion.div>
       </div>
     );
@@ -159,20 +238,22 @@ export default function PublicBooking() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl gradient-accent flex items-center justify-center text-primary-foreground font-bold text-lg">
-                {businessData.name.charAt(0)}
+                {businessData.business_name?.charAt(0) || "?"}
               </div>
               <div>
-                <h1 className="font-bold text-foreground">{businessData.name}</h1>
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <MapPin className="w-3 h-3" />
-                  <span className="truncate max-w-[200px]">{businessData.address}</span>
-                </div>
+                <h1 className="font-bold text-foreground">{businessData.business_name}</h1>
+                {businessData.address && (
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <MapPin className="w-3 h-3" />
+                    <span className="truncate max-w-[200px]">{businessData.address}</span>
+                  </div>
+                )}
               </div>
             </div>
             {businessData.instagram && (
               <Button variant="ghost" size="icon" asChild>
                 <a
-                  href={`https://instagram.com/${businessData.instagram}`}
+                  href={`https://instagram.com/${businessData.instagram.replace('@', '')}`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -187,7 +268,7 @@ export default function PublicBooking() {
       {/* Progress */}
       <div className="max-w-2xl mx-auto px-4 py-6">
         <div className="flex items-center justify-center gap-2 mb-8">
-          {[1, 2, 3, 4].map((s) => (
+          {[1, 2, 3].map((s) => (
             <div key={s} className="flex items-center">
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
@@ -198,7 +279,7 @@ export default function PublicBooking() {
               >
                 {s}
               </div>
-              {s < 4 && (
+              {s < 3 && (
                 <div
                   className={`w-8 h-1 mx-1 rounded ${
                     step > s ? "bg-highlight" : "bg-muted"
@@ -216,68 +297,42 @@ export default function PublicBooking() {
             animate={{ opacity: 1, x: 0 }}
           >
             <h2 className="text-xl font-bold text-foreground mb-4">Escolha o serviço</h2>
-            <div className="grid gap-3">
-              {businessData.services.map((service) => (
-                <Card
-                  key={service.id}
-                  variant={selectedService === service.id ? "highlight" : "elevated"}
-                  className={`p-4 cursor-pointer transition-all ${
-                    selectedService === service.id ? "" : "hover:border-highlight/30"
-                  }`}
-                  onClick={() => setSelectedService(service.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-foreground">{service.name}</p>
-                      <p className="text-sm text-muted-foreground flex items-center gap-2">
-                        <Clock className="w-4 h-4" />
-                        {service.duration} min
-                      </p>
+            {services.length === 0 ? (
+              <Card variant="elevated" className="p-8 text-center">
+                <p className="text-muted-foreground">Nenhum serviço disponível no momento.</p>
+              </Card>
+            ) : (
+              <div className="grid gap-3">
+                {services.map((svc) => (
+                  <Card
+                    key={svc.id}
+                    variant={selectedService === svc.id ? "highlight" : "elevated"}
+                    className={`p-4 cursor-pointer transition-all ${
+                      selectedService === svc.id ? "" : "hover:border-highlight/30"
+                    }`}
+                    onClick={() => setSelectedService(svc.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-foreground">{svc.name}</p>
+                        <p className="text-sm text-muted-foreground flex items-center gap-2">
+                          <Clock className="w-4 h-4" />
+                          {svc.duration} min
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-highlight">R$ {svc.price}</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-highlight">R$ {service.price}</p>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
+                  </Card>
+                ))}
+              </div>
+            )}
           </motion.div>
         )}
 
-        {/* Step 2: Select Professional */}
+        {/* Step 2: Select Date & Time */}
         {step === 2 && (
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-          >
-            <h2 className="text-xl font-bold text-foreground mb-4">Escolha o profissional</h2>
-            <div className="grid gap-3">
-              {businessData.professionals.map((prof) => (
-                <Card
-                  key={prof.id}
-                  variant={selectedProfessional === prof.id ? "highlight" : "elevated"}
-                  className={`p-4 cursor-pointer transition-all ${
-                    selectedProfessional === prof.id ? "" : "hover:border-highlight/30"
-                  }`}
-                  onClick={() => setSelectedProfessional(prof.id)}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-full gradient-accent flex items-center justify-center text-primary-foreground font-bold text-lg">
-                      {prof.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-foreground">{prof.name}</p>
-                      <p className="text-sm text-muted-foreground">{prof.role}</p>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </motion.div>
-        )}
-
-        {/* Step 3: Select Date & Time */}
-        {step === 3 && (
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -316,8 +371,8 @@ export default function PublicBooking() {
           </motion.div>
         )}
 
-        {/* Step 4: Client Data */}
-        {step === 4 && (
+        {/* Step 3: Client Data */}
+        {step === 3 && (
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -336,6 +391,7 @@ export default function PublicBooking() {
                       value={clientData.name}
                       onChange={(e) => setClientData({ ...clientData, name: e.target.value })}
                       className="pl-10"
+                      required
                     />
                   </div>
                 </div>
@@ -349,6 +405,7 @@ export default function PublicBooking() {
                       value={clientData.phone}
                       onChange={(e) => setClientData({ ...clientData, phone: e.target.value })}
                       className="pl-10"
+                      required
                     />
                   </div>
                 </div>
@@ -362,10 +419,6 @@ export default function PublicBooking() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Serviço:</span>
                   <span className="font-medium text-foreground">{service?.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Profissional:</span>
-                  <span className="font-medium text-foreground">{professional?.name}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Data:</span>
@@ -397,7 +450,13 @@ export default function PublicBooking() {
             Voltar
           </Button>
           <Button variant="hero" onClick={nextStep} disabled={isSubmitting}>
-            {isSubmitting ? "Confirmando..." : step === 4 ? "Confirmar Agendamento" : "Próximo"}
+            {isSubmitting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : step === 3 ? (
+              "Confirmar Agendamento"
+            ) : (
+              "Próximo"
+            )}
             {!isSubmitting && <ArrowRight className="w-4 h-4 ml-2" />}
           </Button>
         </div>
@@ -406,7 +465,7 @@ export default function PublicBooking() {
       {/* Footer */}
       <footer className="fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur border-t border-border p-4 text-center">
         <p className="text-xs text-muted-foreground">
-          Powered by <span className="text-highlight font-semibold">AgendePro</span> — UltraMind Solutions
+          Powered by <span className="text-highlight font-semibold">UltraMind</span> — Micro SaaS
         </p>
       </footer>
     </div>

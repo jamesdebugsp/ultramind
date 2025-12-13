@@ -4,74 +4,105 @@ import {
   Users, 
   TrendingUp, 
   Clock, 
-  AlertCircle,
+  Scissors,
   ArrowUpRight,
   ArrowDownRight,
   ExternalLink,
   Copy,
-  CheckCircle2
+  CheckCircle2,
+  Loader2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
-
-const stats = [
-  {
-    title: "Agendamentos Hoje",
-    value: "12",
-    change: "+3",
-    trend: "up",
-    icon: Calendar,
-  },
-  {
-    title: "Clientes Ativos",
-    value: "248",
-    change: "+15%",
-    trend: "up",
-    icon: Users,
-  },
-  {
-    title: "Taxa de Presença",
-    value: "92%",
-    change: "+5%",
-    trend: "up",
-    icon: TrendingUp,
-  },
-  {
-    title: "Faltas do Mês",
-    value: "8",
-    change: "-20%",
-    trend: "down",
-    icon: AlertCircle,
-  },
-];
-
-const upcomingAppointments = [
-  { id: 1, client: "Maria Silva", service: "Corte + Escova", time: "09:00", professional: "Ana" },
-  { id: 2, client: "João Santos", service: "Barba", time: "09:30", professional: "Carlos" },
-  { id: 3, client: "Patrícia Lima", service: "Manicure", time: "10:00", professional: "Fernanda" },
-  { id: 4, client: "Ricardo Costa", service: "Corte Masculino", time: "10:30", professional: "Carlos" },
-  { id: 5, client: "Camila Souza", service: "Coloração", time: "11:00", professional: "Ana" },
-];
-
-const popularServices = [
-  { name: "Corte Feminino", count: 45 },
-  { name: "Corte Masculino", count: 38 },
-  { name: "Escova", count: 32 },
-  { name: "Manicure", count: 28 },
-  { name: "Coloração", count: 22 },
-];
+import { useProfile } from "@/hooks/useProfile";
+import { useServices } from "@/hooks/useServices";
+import { useClients } from "@/hooks/useClients";
+import { useAppointments } from "@/hooks/useAppointments";
 
 export default function Dashboard() {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
-  const bookingUrl = "agende.ultramind.com/salao-premium";
+  const { profile, loading: profileLoading } = useProfile();
+  const { services, loading: servicesLoading } = useServices();
+  const { clients, loading: clientsLoading } = useClients();
+  const { appointments, loading: appointmentsLoading } = useAppointments();
+
+  const loading = profileLoading || servicesLoading || clientsLoading || appointmentsLoading;
+
+  const businessSlug = useMemo(() => {
+    if (!profile?.business_name) return "meu-negocio";
+    return profile.business_name
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+  }, [profile?.business_name]);
+
+  const bookingUrl = `${window.location.origin}/agendar/${businessSlug}`;
+
+  const today = new Date().toISOString().split("T")[0];
+  const todayAppointments = appointments.filter(a => a.date === today);
+  const confirmedToday = todayAppointments.filter(a => a.status === "confirmado").length;
+
+  const stats = [
+    {
+      title: "Agendamentos Hoje",
+      value: todayAppointments.length.toString(),
+      change: `${confirmedToday} confirmados`,
+      trend: "up" as const,
+      icon: Calendar,
+    },
+    {
+      title: "Clientes",
+      value: clients.length.toString(),
+      change: "+0%",
+      trend: "up" as const,
+      icon: Users,
+    },
+    {
+      title: "Serviços Ativos",
+      value: services.filter(s => s.status === 'active').length.toString(),
+      change: `${services.length} total`,
+      trend: "up" as const,
+      icon: Scissors,
+    },
+    {
+      title: "Taxa de Presença",
+      value: appointments.length > 0 
+        ? `${Math.round((appointments.filter(a => a.status === 'concluido').length / appointments.length) * 100)}%`
+        : "0%",
+      change: "últimos 30 dias",
+      trend: "up" as const,
+      icon: TrendingUp,
+    },
+  ];
+
+  const upcomingAppointments = appointments
+    .filter(a => a.date >= today && a.status !== 'cancelado')
+    .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))
+    .slice(0, 5);
+
+  const popularServices = useMemo(() => {
+    const serviceCounts: Record<string, number> = {};
+    appointments.forEach(a => {
+      if (a.service_id) {
+        serviceCounts[a.service_id] = (serviceCounts[a.service_id] || 0) + 1;
+      }
+    });
+    
+    return services
+      .map(s => ({ name: s.name, count: serviceCounts[s.id] || 0 }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }, [services, appointments]);
 
   const copyLink = () => {
-    navigator.clipboard.writeText(`https://${bookingUrl}`);
+    navigator.clipboard.writeText(bookingUrl);
     setCopied(true);
     toast({
       title: "Link copiado!",
@@ -79,6 +110,16 @@ export default function Dashboard() {
     });
     setTimeout(() => setCopied(false), 2000);
   };
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-full">
+          <Loader2 className="w-8 h-8 animate-spin text-highlight" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -90,7 +131,7 @@ export default function Dashboard() {
           className="mb-8"
         >
           <h1 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">
-            Bom dia! 👋
+            {profile?.business_name ? `${profile.business_name}` : "Bom dia!"} 👋
           </h1>
           <p className="text-muted-foreground">
             Aqui está o resumo do seu dia
@@ -108,7 +149,7 @@ export default function Dashboard() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <p className="text-sm text-muted-foreground mb-1">Sua página de agendamentos</p>
-                <p className="font-mono text-lg font-medium text-foreground">{bookingUrl}</p>
+                <p className="font-mono text-lg font-medium text-foreground break-all">{bookingUrl}</p>
               </div>
               <div className="flex gap-2">
                 <Button variant="highlight-outline" size="sm" onClick={copyLink}>
@@ -116,7 +157,7 @@ export default function Dashboard() {
                   {copied ? "Copiado!" : "Copiar"}
                 </Button>
                 <Button variant="highlight" size="sm" asChild>
-                  <a href={`/agendar/salao-premium`} target="_blank">
+                  <a href={`/agendar/${businessSlug}`} target="_blank">
                     <ExternalLink className="w-4 h-4 mr-2" />
                     Abrir
                   </a>
@@ -140,16 +181,7 @@ export default function Dashboard() {
                   <div className="w-10 h-10 rounded-lg bg-highlight/10 flex items-center justify-center">
                     <stat.icon className="w-5 h-5 text-highlight" />
                   </div>
-                  <div
-                    className={`flex items-center gap-1 text-xs font-medium ${
-                      stat.trend === "up" ? "text-emerald-600" : "text-destructive"
-                    }`}
-                  >
-                    {stat.trend === "up" ? (
-                      <ArrowUpRight className="w-3 h-3" />
-                    ) : (
-                      <ArrowDownRight className="w-3 h-3" />
-                    )}
+                  <div className="text-xs text-muted-foreground">
                     {stat.change}
                   </div>
                 </div>
@@ -179,31 +211,43 @@ export default function Dashboard() {
                 </Button>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {upcomingAppointments.map((appointment) => (
-                    <div
-                      key={appointment.id}
-                      className="flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full gradient-accent flex items-center justify-center text-primary-foreground text-sm font-bold">
-                          {appointment.client.split(" ").map((n) => n[0]).join("")}
+                {upcomingAppointments.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>Nenhum agendamento próximo</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {upcomingAppointments.map((appointment) => {
+                      const service = services.find(s => s.id === appointment.service_id);
+                      return (
+                        <div
+                          key={appointment.id}
+                          className="flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full gradient-accent flex items-center justify-center text-primary-foreground text-sm font-bold">
+                              {appointment.client_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-medium text-foreground">{appointment.client_name}</p>
+                              <p className="text-sm text-muted-foreground">{service?.name || "Serviço"}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-4 h-4 text-muted-foreground" />
+                              <span className="font-semibold text-foreground">{appointment.time}</span>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {new Date(appointment.date + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium text-foreground">{appointment.client}</p>
-                          <p className="text-sm text-muted-foreground">{appointment.service}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-muted-foreground" />
-                          <span className="font-semibold text-foreground">{appointment.time}</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground">{appointment.professional}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>
@@ -219,27 +263,34 @@ export default function Dashboard() {
                 <CardTitle className="text-lg font-bold">Serviços Populares</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {popularServices.map((service, index) => (
-                    <div key={service.name} className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-sm font-bold text-muted-foreground">
-                        {index + 1}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-sm font-medium text-foreground">{service.name}</p>
-                          <Badge variant="highlight">{service.count}</Badge>
+                {popularServices.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Scissors className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>Nenhum serviço cadastrado</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {popularServices.map((service, index) => (
+                      <div key={service.name} className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center text-sm font-bold text-muted-foreground">
+                          {index + 1}
                         </div>
-                        <div className="h-2 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className="h-full gradient-accent rounded-full"
-                            style={{ width: `${(service.count / 45) * 100}%` }}
-                          />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-sm font-medium text-foreground">{service.name}</p>
+                            <Badge variant="highlight">{service.count}</Badge>
+                          </div>
+                          <div className="h-2 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className="h-full gradient-accent rounded-full"
+                              style={{ width: `${popularServices[0]?.count > 0 ? (service.count / popularServices[0].count) * 100 : 0}%` }}
+                            />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>

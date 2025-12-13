@@ -14,7 +14,270 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      appointments: {
+        Row: {
+          client_id: string | null
+          client_name: string
+          client_whatsapp: string | null
+          confirmed_at: string | null
+          created_at: string
+          date: string
+          id: string
+          notes: string | null
+          service_id: string | null
+          status: string
+          time: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id?: string | null
+          client_name: string
+          client_whatsapp?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          date: string
+          id?: string
+          notes?: string | null
+          service_id?: string | null
+          status?: string
+          time: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string | null
+          client_name?: string
+          client_whatsapp?: string | null
+          confirmed_at?: string | null
+          created_at?: string
+          date?: string
+          id?: string
+          notes?: string | null
+          service_id?: string | null
+          status?: string
+          time?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointments_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+          whatsapp: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+          whatsapp?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+          whatsapp?: string | null
+        }
+        Relationships: []
+      }
+      posts: {
+        Row: {
+          content: string | null
+          created_at: string
+          id: string
+          image_url: string | null
+          published_at: string | null
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          published_at?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          published_at?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          address: string | null
+          business_name: string | null
+          created_at: string
+          description: string | null
+          email: string | null
+          id: string
+          instagram: string | null
+          logo_url: string | null
+          owner_name: string | null
+          phone: string | null
+          updated_at: string
+          user_id: string
+          whatsapp: string | null
+        }
+        Insert: {
+          address?: string | null
+          business_name?: string | null
+          created_at?: string
+          description?: string | null
+          email?: string | null
+          id?: string
+          instagram?: string | null
+          logo_url?: string | null
+          owner_name?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+          whatsapp?: string | null
+        }
+        Update: {
+          address?: string | null
+          business_name?: string | null
+          created_at?: string
+          description?: string | null
+          email?: string | null
+          id?: string
+          instagram?: string | null
+          logo_url?: string | null
+          owner_name?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+          whatsapp?: string | null
+        }
+        Relationships: []
+      }
+      services: {
+        Row: {
+          created_at: string
+          description: string | null
+          duration: number
+          id: string
+          name: string
+          price: number
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          duration?: number
+          id?: string
+          name: string
+          price?: number
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          duration?: number
+          id?: string
+          name?: string
+          price?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      settings: {
+        Row: {
+          appointment_interval: number | null
+          auto_confirm: boolean | null
+          created_at: string
+          id: string
+          language: string | null
+          reminder_hours: number | null
+          send_reminders: boolean | null
+          theme: string | null
+          updated_at: string
+          user_id: string
+          working_days: Json | null
+          working_hours_end: string | null
+          working_hours_start: string | null
+        }
+        Insert: {
+          appointment_interval?: number | null
+          auto_confirm?: boolean | null
+          created_at?: string
+          id?: string
+          language?: string | null
+          reminder_hours?: number | null
+          send_reminders?: boolean | null
+          theme?: string | null
+          updated_at?: string
+          user_id: string
+          working_days?: Json | null
+          working_hours_end?: string | null
+          working_hours_start?: string | null
+        }
+        Update: {
+          appointment_interval?: number | null
+          auto_confirm?: boolean | null
+          created_at?: string
+          id?: string
+          language?: string | null
+          reminder_hours?: number | null
+          send_reminders?: boolean | null
+          theme?: string | null
+          updated_at?: string
+          user_id?: string
+          working_days?: Json | null
+          working_hours_end?: string | null
+          working_hours_start?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
