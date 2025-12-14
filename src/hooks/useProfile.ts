@@ -25,6 +25,28 @@ export function useProfile() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const createProfile = async () => {
+    if (!user) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert({
+          user_id: user.id,
+          email: user.email,
+          owner_name: user.user_metadata?.name || null
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error: any) {
+      console.error('Error creating profile:', error);
+      return null;
+    }
+  };
+
   const fetchProfile = async () => {
     if (!user) {
       setLoading(false);
@@ -32,13 +54,19 @@ export function useProfile() {
     }
 
     try {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
 
       if (error) throw error;
+
+      // If no profile exists, create one
+      if (!data) {
+        data = await createProfile();
+      }
+
       setProfile(data);
     } catch (error: any) {
       console.error('Error fetching profile:', error);
@@ -51,6 +79,14 @@ export function useProfile() {
     if (!user) return { error: new Error('Not authenticated') };
 
     try {
+      // Ensure profile exists before updating
+      if (!profile) {
+        const newProfile = await createProfile();
+        if (!newProfile) {
+          throw new Error('Could not create profile');
+        }
+      }
+
       const { data, error } = await supabase
         .from('profiles')
         .update(updates)
@@ -70,7 +106,7 @@ export function useProfile() {
     } catch (error: any) {
       toast({
         title: "Erro ao salvar",
-        description: error.message,
+        description: "Tente novamente.",
         variant: "destructive",
       });
       return { data: null, error };
