@@ -1,74 +1,82 @@
-# Welcome to your Lovable project
+<p align="center">
+  <img src="./assets/logo-ultramind.png" alt="UltraMind Solutions Logo" width="160"/>
+</p>
 
-## Project info
+<h1 align="center">UltraMind Solutions</h1>
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+<p align="center">
+  Automações inteligentes e plataformas SaaS com IA para empresas, empreendedores e criadores que querem crescer mais rápido e com menos esforço.
+</p>
 
-## How can I edit this code?
+<p align="center">
+  <a href="https://ultramind-livid.vercel.app/">🌐 Website</a>
+</p>
 
-There are several ways of editing your application.
+---
 
-**Use Lovable**
+## 🧠 Sobre a UltraMind
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+A **UltraMind Solutions** cria **automações inteligentes** e **plataformas SaaS sob medida**, focadas em otimizar atendimento, processos e escala de negócios utilizando tecnologia moderna e inteligência artificial.
 
-Changes made via Lovable will be committed automatically to this repo.
+---
 
-**Use your preferred IDE**
+## 🎯 O que fazemos
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+* Automações de atendimento e processos
+* Plataformas SaaS e MicroSaaS
+* Integrações com Inteligência Artificial
+* Soluções digitais focadas em crescimento
 
-The only requirement is having Bun installed - [install Bun](https://bun.sh/docs/installation)
+---
 
-Follow these steps:
+## ⚙️ Como executar o projeto
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+```bash
+# Clone o repositório
+git clone https://github.com/jamesdebugsp/ultramind.git
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Entre na pasta
+cd ultramind
 
-# Step 3: Install the necessary dependencies.
-bun install
+# Instale as dependências
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-bun run dev
+# Rode o projeto
+npm run dev
 ```
 
-**Edit a file directly in GitHub**
+📍 Aplicação disponível em:
+`http://localhost:5173`
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+---
 
-**Use GitHub Codespaces**
+## 🛠️ Tecnologias
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+* React
+* Vite
+* Tailwind CSS
+* Supabase
+* Integrações com IA
+* Deploy via Vercel
 
-## What technologies are used for this project?
+---
 
-This project is built with:
+## 🚀 Status
 
-- Bun 1.3.4
-- Vite 7.2.7
-- TypeScript
-- React 19.2.1
-- shadcn-ui
-- Tailwind CSS
+🟢 MVP em desenvolvimento ativo.
 
-## How can I deploy this project?
+---
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+## 👤 Autor
 
-## Can I connect a custom domain to my Lovable project?
+**James Rodrigo**
+Founder & Developer — UltraMind Solutions
 
-Yes, you can!
+🔗 GitHub: [https://github.com/jamesdebugsp](https://github.com/jamesdebugsp)
+🌐 Website: [https://ultramind-livid.vercel.app/](https://ultramind-livid.vercel.app/)
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+---
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## 📜 Licença
+
+Licença MIT.
