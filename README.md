@@ -80,3 +80,6 @@ Founder & Developer — UltraMind Solutions
 ## 📜 Licença
 
 Licença MIT.
+
+
+<!-- redeploy -->
