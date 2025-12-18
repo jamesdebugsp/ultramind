@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://ultramind-livid.vercel.app/">🌐 Website</a>
+  <a href="https://ultramind-liard.vercel.app/">🌐 Website</a>
 </p>
 
 ---
