@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { 
   QrCode, 
@@ -8,20 +8,106 @@ import {
   Share2,
   Download,
   Instagram,
-  MessageSquare
+  MessageSquare,
+  Loader2,
+  Link as LinkIcon,
+  Pencil
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useToast } from "@/hooks/use-toast";
+import { useProfile } from "@/hooks/useProfile";
 import { QRCodeSVG } from "qrcode.react";
+import { supabase } from "@/integrations/supabase/client";
+
+function generateSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
 
 export default function MinhaPagina() {
   const [copied, setCopied] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [slugInput, setSlugInput] = useState("");
+  const [slugError, setSlugError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
-  
-  const bookingUrl = "https://agende.ultramind.com/salao-premium";
-  const previewUrl = "/agendar/salao-premium";
+  const { profile, loading, updateProfile, refetch } = useProfile();
+
+  const currentSlug = useMemo(() => {
+    if (profile?.slug) return profile.slug;
+    if (profile?.business_name) return generateSlug(profile.business_name);
+    return "";
+  }, [profile]);
+
+  useEffect(() => {
+    setSlugInput(currentSlug);
+  }, [currentSlug]);
+
+  const baseUrl = window.location.origin;
+  const bookingUrl = `${baseUrl}/agendar/${currentSlug}`;
+  const previewUrl = `/agendar/${currentSlug}`;
+
+  const validateSlug = async (slug: string): Promise<boolean> => {
+    if (!slug.trim()) {
+      setSlugError("O link não pode estar vazio");
+      return false;
+    }
+
+    if (slug.length < 3) {
+      setSlugError("Mínimo de 3 caracteres");
+      return false;
+    }
+
+    if (!/^[a-z0-9-]+$/.test(slug)) {
+      setSlugError("Use apenas letras, números e hífens");
+      return false;
+    }
+
+    // Check if slug is already in use by another user
+    const { data } = await supabase
+      .from('profiles')
+      .select('user_id')
+      .eq('slug', slug)
+      .maybeSingle();
+
+    if (data && data.user_id !== profile?.user_id) {
+      setSlugError("Este link já está em uso");
+      return false;
+    }
+
+    setSlugError("");
+    return true;
+  };
+
+  const handleSlugChange = (value: string) => {
+    const formatted = generateSlug(value);
+    setSlugInput(formatted);
+    setSlugError("");
+  };
+
+  const saveSlug = async () => {
+    const isValid = await validateSlug(slugInput);
+    if (!isValid) return;
+
+    setIsSaving(true);
+    try {
+      await updateProfile({ slug: slugInput });
+      setIsEditing(false);
+      await refetch();
+    } catch (error) {
+      console.error('Error saving slug:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const copyLink = () => {
     navigator.clipboard.writeText(bookingUrl);
@@ -71,6 +157,16 @@ export default function MinhaPagina() {
     });
   };
 
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-full">
+          <Loader2 className="w-8 h-8 animate-spin text-highlight" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <div className="p-4 lg:p-8">
@@ -96,24 +192,90 @@ export default function MinhaPagina() {
             transition={{ delay: 0.1 }}
           >
             <Card variant="highlight" className="p-6">
-              <h3 className="font-semibold text-foreground mb-4">Seu link de agendamento</h3>
-              
-              <div className="bg-background/50 rounded-lg p-4 mb-4">
-                <p className="font-mono text-lg text-foreground break-all">{bookingUrl}</p>
-              </div>
-              
-              <div className="flex flex-wrap gap-3">
-                <Button variant="highlight" onClick={copyLink}>
-                  {copied ? <CheckCircle2 className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
-                  {copied ? "Copiado!" : "Copiar Link"}
-                </Button>
-                <Button variant="highlight-outline" asChild>
-                  <a href={previewUrl} target="_blank" rel="noopener noreferrer">
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Visualizar
-                  </a>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-foreground">Seu link de agendamento</h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setIsEditing(!isEditing)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Pencil className="w-4 h-4 mr-1" />
+                  Personalizar
                 </Button>
               </div>
+
+              {isEditing ? (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="slug">Link personalizado</Label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground whitespace-nowrap">
+                        {baseUrl}/agendar/
+                      </span>
+                      <Input
+                        id="slug"
+                        value={slugInput}
+                        onChange={(e) => handleSlugChange(e.target.value)}
+                        placeholder="seu-negocio"
+                        className="flex-1"
+                      />
+                    </div>
+                    {slugError && (
+                      <p className="text-sm text-destructive">{slugError}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Use apenas letras minúsculas, números e hífens
+                    </p>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="highlight" 
+                      onClick={saveSlug}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : null}
+                      Salvar
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setIsEditing(false);
+                        setSlugInput(currentSlug);
+                        setSlugError("");
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-background/50 rounded-lg p-4 mb-4">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                      <LinkIcon className="w-4 h-4" />
+                      <span className="text-sm">Link público</span>
+                    </div>
+                    <p className="font-mono text-lg text-foreground break-all">{bookingUrl}</p>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-3">
+                    <Button variant="highlight" onClick={copyLink}>
+                      {copied ? <CheckCircle2 className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
+                      {copied ? "Copiado!" : "Copiar Link"}
+                    </Button>
+                    <Button variant="highlight-outline" asChild>
+                      <a href={previewUrl} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Visualizar
+                      </a>
+                    </Button>
+                  </div>
+                </>
+              )}
             </Card>
           </motion.div>
 

@@ -15,6 +15,7 @@ export interface Profile {
   address: string | null;
   description: string | null;
   logo_url: string | null;
+  slug: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -79,18 +80,13 @@ export function useProfile() {
     if (!user) return { error: new Error('Not authenticated') };
 
     try {
-      // Ensure profile exists before updating
-      if (!profile) {
-        const newProfile = await createProfile();
-        if (!newProfile) {
-          throw new Error('Could not create profile');
-        }
-      }
-
       const { data, error } = await supabase
         .from('profiles')
-        .update(updates)
-        .eq('user_id', user.id)
+        .upsert({
+          user_id: user.id,
+          email: user.email,
+          ...updates,
+        }, { onConflict: 'user_id' })
         .select()
         .single();
 
@@ -106,7 +102,7 @@ export function useProfile() {
     } catch (error: any) {
       toast({
         title: "Erro ao salvar",
-        description: "Tente novamente.",
+        description: error.message || "Tente novamente.",
         variant: "destructive",
       });
       return { data: null, error };

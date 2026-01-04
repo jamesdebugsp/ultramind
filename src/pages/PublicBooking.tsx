@@ -128,22 +128,34 @@ export default function PublicBooking() {
 
   const loadBusinessData = async () => {
     try {
-      const { data: profiles, error: profileError } = await supabase
+      // First try to find by exact slug match
+      let { data: profileBySlug } = await supabase
         .from('profiles')
         .select('*')
-        .not('business_name', 'is', null);
+        .eq('slug', slug)
+        .maybeSingle();
 
-      if (profileError) throw profileError;
+      let matchingProfile = profileBySlug;
 
-      const matchingProfile = profiles?.find(p => {
-        const profileSlug = p.business_name
-          ?.toLowerCase()
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-|-$/g, "");
-        return profileSlug === slug;
-      });
+      // If no slug match, fallback to business_name-derived slug
+      if (!matchingProfile) {
+        const { data: profiles, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .not('business_name', 'is', null);
+
+        if (profileError) throw profileError;
+
+        matchingProfile = profiles?.find(p => {
+          const profileSlug = p.business_name
+            ?.toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "");
+          return profileSlug === slug;
+        }) || null;
+      }
 
       if (matchingProfile) {
         setBusinessData(matchingProfile as BusinessData);
