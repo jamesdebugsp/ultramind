@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 export interface Profile {
   id: string;
@@ -25,93 +25,111 @@ export function useProfile() {
   const { toast } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
-  const createProfile = async () => {
+  const createProfile = async (): Promise<Profile | null> => {
     if (!user) return null;
 
     try {
       const { data, error } = await supabase
-        .from('profiles')
+        .from("profiles")
         .insert({
           user_id: user.id,
           email: user.email,
-          owner_name: user.user_metadata?.name || null
+          owner_name: (user.user_metadata as any)?.name || null,
         })
         .select()
         .single();
 
       if (error) throw error;
-      return data;
-    } catch (error: any) {
-      console.error('Error creating profile:', error);
+      return data as Profile;
+    } catch (err: any) {
+      console.error("Error creating profile:", err);
+      setError(err);
       return null;
     }
   };
 
   const fetchProfile = async () => {
     if (!user) {
+      setProfile(null);
+      setError(null);
       setLoading(false);
       return;
     }
 
+    setLoading(true);
+    setError(null);
+
     try {
       let { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', user.id)
+        .from("profiles")
+        .select("*")
+        .eq("user_id", user.id)
         .maybeSingle();
 
       if (error) throw error;
 
-      // If no profile exists, create one
       if (!data) {
         data = await createProfile();
       }
 
-      setProfile(data);
-    } catch (error: any) {
-      console.error('Error fetching profile:', error);
+      setProfile((data as Profile) ?? null);
+    } catch (err: any) {
+      console.error("Error fetching profile:", err);
+      setProfile(null);
+      setError(err);
     } finally {
       setLoading(false);
     }
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
-    if (!user) return { error: new Error('Not authenticated') };
+    if (!user) return { data: null, error: new Error("Not authenticated") };
+
+    setError(null);
 
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .upsert({
-          user_id: user.id,
-          email: user.email,
-          ...updates,
-        }, { onConflict: 'user_id' })
+        .from("profiles")
+        .upsert(
+          {
+            user_id: user.id,
+            email: user.email,
+            ...updates,
+          },
+          { onConflict: "user_id" }
+        )
         .select()
         .single();
 
       if (error) throw error;
-      
-      setProfile(data);
+
+      // Rebusca para garantir consistência (persistência real)
+      await fetchProfile();
+
       toast({
         title: "Perfil atualizado!",
         description: "As alterações foram salvas com sucesso.",
       });
-      
-      return { data, error: null };
-    } catch (error: any) {
+
+      return { data: data as Profile, error: null };
+    } catch (err: any) {
+      setError(err);
       toast({
         title: "Erro ao salvar",
-        description: error.message || "Tente novamente.",
+        description: err?.message || "Tente novamente.",
         variant: "destructive",
       });
-      return { data: null, error };
+      return { data: null, error: err };
     }
   };
 
   useEffect(() => {
     fetchProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  return { profile, loading, updateProfile, refetch: fetchProfile };
+  return { profile, loading, error, updateProfile, refetch: fetchProfile };
 }
+

@@ -118,6 +118,7 @@ export default function PublicBooking() {
 
   useEffect(() => {
     loadBusinessData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
   useEffect(() => {
@@ -127,72 +128,102 @@ export default function PublicBooking() {
   }, [selectedDate, businessData]);
 
   const loadBusinessData = async () => {
+    setLoading(true);
+
+    // Validação obrigatória do param
+    if (!slug || typeof slug !== "string" || !slug.trim()) {
+      setBusinessData(null);
+      setServices([]);
+      setSettings(DEFAULT_SETTINGS);
+      setLoading(false);
+      return;
+    }
+
     try {
       // First try to find by exact slug match
-      let { data: profileBySlug } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('slug', slug)
+      let { data: profileBySlug, error: slugError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("slug", slug)
         .maybeSingle();
 
-      let matchingProfile = profileBySlug;
+      if (slugError) throw slugError;
+
+      let matchingProfile = profileBySlug as any;
 
       // If no slug match, fallback to business_name-derived slug
       if (!matchingProfile) {
         const { data: profiles, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .not('business_name', 'is', null);
+          .from("profiles")
+          .select("*")
+          .not("business_name", "is", null);
 
         if (profileError) throw profileError;
 
-        matchingProfile = profiles?.find(p => {
-          const profileSlug = p.business_name
-            ?.toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-|-$/g, "");
-          return profileSlug === slug;
-        }) || null;
+        matchingProfile =
+          profiles?.find((p: any) => {
+            const profileSlug = p.business_name
+              ?.toLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .replace(/[^a-z0-9]+/g, "-")
+              .replace(/^-|-$/g, "");
+            return profileSlug === slug;
+          }) || null;
       }
 
       if (matchingProfile) {
         setBusinessData(matchingProfile as BusinessData);
-        
-        // Load services
-        const { data: servicesData } = await supabase
-          .from('services')
-          .select('id, name, duration, price')
-          .eq('user_id', matchingProfile.user_id)
-          .eq('status', 'active');
 
+        // Load services
+        const { data: servicesData, error: servicesError } = await supabase
+          .from("services")
+          .select("id, name, duration, price")
+          .eq("user_id", matchingProfile.user_id)
+          .eq("status", "active");
+
+        if (servicesError) throw servicesError;
         setServices(servicesData || []);
 
         // Load settings
-        const { data: settingsData } = await supabase
-          .from('settings')
-          .select('working_hours_start, working_hours_end, appointment_interval, working_days')
-          .eq('user_id', matchingProfile.user_id)
+        const { data: settingsData, error: settingsError } = await supabase
+          .from("settings")
+          .select("working_hours_start, working_hours_end, appointment_interval, working_days")
+          .eq("user_id", matchingProfile.user_id)
           .maybeSingle();
+
+        if (settingsError) throw settingsError;
 
         if (settingsData) {
           setSettings({
-            working_hours_start: settingsData.working_hours_start || DEFAULT_SETTINGS.working_hours_start,
-            working_hours_end: settingsData.working_hours_end || DEFAULT_SETTINGS.working_hours_end,
-            appointment_interval: settingsData.appointment_interval || DEFAULT_SETTINGS.appointment_interval,
-            working_days: Array.isArray(settingsData.working_days) 
-              ? settingsData.working_days as string[] 
-              : DEFAULT_SETTINGS.working_days
+            working_hours_start:
+              settingsData.working_hours_start || DEFAULT_SETTINGS.working_hours_start,
+            working_hours_end:
+              settingsData.working_hours_end || DEFAULT_SETTINGS.working_hours_end,
+            appointment_interval:
+              settingsData.appointment_interval || DEFAULT_SETTINGS.appointment_interval,
+            working_days: Array.isArray(settingsData.working_days)
+              ? (settingsData.working_days as string[])
+              : DEFAULT_SETTINGS.working_days,
           });
+        } else {
+          setSettings(DEFAULT_SETTINGS);
         }
+      } else {
+        setBusinessData(null);
+        setServices([]);
+        setSettings(DEFAULT_SETTINGS);
       }
     } catch (error) {
-      console.error('Error loading business data:', error);
+      console.error("Error loading business data:", error);
+      setBusinessData(null);
+      setServices([]);
+      setSettings(DEFAULT_SETTINGS);
     } finally {
       setLoading(false);
     }
   };
+
 
   const loadAppointmentsForDate = async (date: string) => {
     if (!businessData) return;

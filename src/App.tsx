@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { PrivateRoute } from "@/components/PrivateRoute";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Cadastro from "./pages/Cadastro";
@@ -32,68 +33,100 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<Index />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/cadastro" element={<Cadastro />} />
-            <Route path="/agendar/:slug" element={<PublicBooking />} />
-            
-            {/* Protected Routes */}
-            <Route path="/onboarding" element={
-              <PrivateRoute>
-                <Onboarding />
-              </PrivateRoute>
-            } />
-            <Route path="/dashboard" element={
-              <PrivateRoute>
-                <Dashboard />
-              </PrivateRoute>
-            } />
-            <Route path="/dashboard/clientes" element={
-              <PrivateRoute>
-                <Clientes />
-              </PrivateRoute>
-            } />
-            <Route path="/dashboard/servicos" element={
-              <PrivateRoute>
-                <Servicos />
-              </PrivateRoute>
-            } />
-            <Route path="/dashboard/agendamentos" element={
-              <PrivateRoute>
-                <Agendamentos />
-              </PrivateRoute>
-            } />
-            <Route path="/dashboard/horarios" element={
-              <PrivateRoute>
-                <Horarios />
-              </PrivateRoute>
-            } />
-            <Route path="/dashboard/bot" element={
-              <PrivateRoute>
-                <BotWhatsApp />
-              </PrivateRoute>
-            } />
-            <Route path="/dashboard/relatorios" element={
-              <PrivateRoute>
-                <Relatorios />
-              </PrivateRoute>
-            } />
-            <Route path="/dashboard/pagina" element={
-              <PrivateRoute>
-                <MinhaPagina />
-              </PrivateRoute>
-            } />
-            <Route path="/dashboard/configuracoes" element={
-              <PrivateRoute>
-                <Configuracoes />
-              </PrivateRoute>
-            } />
-            
-            {/* Catch-all */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <ErrorBoundary>
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/" element={<Index />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/cadastro" element={<Cadastro />} />
+              <Route path="/agendar/:slug" element={<PublicBooking />} />
+
+              {/* Protected Routes */}
+              <Route
+                path="/onboarding"
+                element={
+                  <PrivateRoute>
+                    <Onboarding />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/dashboard"
+                element={
+                  <PrivateRoute>
+                    <Dashboard />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/dashboard/clientes"
+                element={
+                  <PrivateRoute>
+                    <Clientes />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/dashboard/servicos"
+                element={
+                  <PrivateRoute>
+                    <Servicos />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/dashboard/agendamentos"
+                element={
+                  <PrivateRoute>
+                    <Agendamentos />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/dashboard/horarios"
+                element={
+                  <PrivateRoute>
+                    <Horarios />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/dashboard/bot"
+                element={
+                  <PrivateRoute>
+                    <BotWhatsApp />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/dashboard/relatorios"
+                element={
+                  <PrivateRoute>
+                    <Relatorios />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/dashboard/pagina"
+                element={
+                  <PrivateRoute>
+                    <MinhaPagina />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/dashboard/configuracoes"
+                element={
+                  <PrivateRoute>
+                    <Configuracoes />
+                  </PrivateRoute>
+                }
+              />
+
+              {/* Catch-all */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </ErrorBoundary>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
@@ -101,3 +134,4 @@ const App = () => (
 );
 
 export default App;
+
