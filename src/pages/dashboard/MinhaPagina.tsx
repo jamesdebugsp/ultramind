@@ -167,6 +167,22 @@ export default function MinhaPagina() {
     );
   }
 
+  if (!profile) {
+    return (
+      <DashboardLayout>
+        <div className="p-4 lg:p-8">
+          <Card className="p-6">
+            <h1 className="text-xl font-semibold text-foreground">Carregando...</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Não foi possível carregar seu perfil agora. Tente atualizar a página.
+            </p>
+          </Card>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+
   return (
     <DashboardLayout>
       <div className="p-4 lg:p-8">
