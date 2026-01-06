@@ -12,7 +12,8 @@ import {
   ChevronRight,
   MessageSquare,
   Plus,
-  Loader2
+  Loader2,
+  Bell
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,17 +35,30 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAppointments } from "@/hooks/useAppointments";
+import { useAppointments, Appointment } from "@/hooks/useAppointments";
 import { useServices } from "@/hooks/useServices";
 import { useClients } from "@/hooks/useClients";
+import { useReminders } from "@/hooks/useReminders";
+import { useSubscription } from "@/hooks/useSubscription";
+import { useProfile } from "@/hooks/useProfile";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Agendamentos() {
   const { appointments, loading, createAppointment, updateAppointment } = useAppointments();
   const { services } = useServices();
   const { clients } = useClients();
+  const { createReminder } = useReminders();
+  const { subscription, canUseFeature } = useSubscription();
+  const { profile } = useProfile();
+  const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isReminderDialogOpen, setIsReminderDialogOpen] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [reminderHours, setReminderHours] = useState("24");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSendingReminder, setIsSendingReminder] = useState(false);
   const [formData, setFormData] = useState({
     client_name: "",
     client_whatsapp: "",
@@ -59,7 +73,7 @@ export default function Agendamentos() {
     e.preventDefault();
     setIsSubmitting(true);
     
-    await createAppointment({
+    const { data: newAppointment } = await createAppointment({
       client_name: formData.client_name,
       client_whatsapp: formData.client_whatsapp || null,
       client_id: null,
@@ -70,6 +84,11 @@ export default function Agendamentos() {
       notes: null,
       confirmed_at: null
     });
+
+    // Send automatic WhatsApp confirmation if enabled and client has WhatsApp
+    if (newAppointment && formData.client_whatsapp && canUseFeature('whatsapp')) {
+      await sendWhatsAppConfirmation(newAppointment, formData.client_whatsapp);
+    }
     
     setFormData({
       client_name: "",
@@ -82,6 +101,36 @@ export default function Agendamentos() {
     setIsSubmitting(false);
   };
 
+  const sendWhatsAppConfirmation = async (appointment: any, phone: string) => {
+    try {
+      const serviceName = appointment.service_id 
+        ? services.find(s => s.id === appointment.service_id)?.name || "Serviço"
+        : "Serviço";
+      
+      const { data, error } = await supabase.functions.invoke('send-whatsapp-confirmation', {
+        body: {
+          appointment_id: appointment.id,
+          client_name: appointment.client_name,
+          client_whatsapp: phone,
+          business_name: profile?.business_name || "Nosso estabelecimento",
+          business_whatsapp: profile?.whatsapp || "",
+          service_name: serviceName,
+          date: appointment.date,
+          time: appointment.time
+        }
+      });
+
+      if (error) throw error;
+
+      // Open WhatsApp with the confirmation message
+      if (data?.clientWhatsAppUrl) {
+        window.open(data.clientWhatsAppUrl, '_blank');
+      }
+    } catch (error) {
+      console.error('Error sending WhatsApp confirmation:', error);
+    }
+  };
+
   const updateStatus = async (id: string, status: string) => {
     await updateAppointment(id, { status });
   };
@@ -90,6 +139,90 @@ export default function Agendamentos() {
     const cleanPhone = phone.replace(/\D/g, "");
     const message = encodeURIComponent(`Olá ${name}! Tudo bem? Estamos confirmando seu agendamento.`);
     window.open(`https://api.whatsapp.com/send?phone=55${cleanPhone}&text=${message}`, "_blank");
+  };
+
+  const openReminderDialog = (appointment: Appointment) => {
+    if (!canUseFeature('reminders')) {
+      toast({
+        title: "Recurso não disponível",
+        description: "Upgrade para PRO ou PREMIUM para usar lembretes automáticos.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setSelectedAppointment(appointment);
+    setIsReminderDialogOpen(true);
+  };
+
+  const handleCreateReminder = async () => {
+    if (!selectedAppointment) return;
+    
+    setIsSendingReminder(true);
+    
+    try {
+      // Calculate reminder time (X hours before appointment)
+      const appointmentDateTime = new Date(`${selectedAppointment.date}T${selectedAppointment.time}`);
+      const reminderTime = new Date(appointmentDateTime.getTime() - parseInt(reminderHours) * 60 * 60 * 1000);
+      
+      const serviceName = selectedAppointment.service_id 
+        ? services.find(s => s.id === selectedAppointment.service_id)?.name || "Serviço"
+        : "Serviço";
+      
+      const message = `Olá ${selectedAppointment.client_name}! Lembrete: seu agendamento em ${profile?.business_name || 'nosso estabelecimento'} é ${parseInt(reminderHours) === 24 ? 'amanhã' : `em ${reminderHours}h`} às ${selectedAppointment.time}. Serviço: ${serviceName}. Confirme sua presença!`;
+
+      // Create reminder in database
+      const { error } = await createReminder(
+        selectedAppointment.id,
+        reminderTime,
+        message
+      );
+
+      if (error) throw error;
+
+      // If reminder time is now or past, send immediately
+      if (reminderTime <= new Date()) {
+        await sendReminderNow(selectedAppointment, message);
+      }
+
+      toast({
+        title: "Lembrete agendado!",
+        description: `O cliente receberá um lembrete ${parseInt(reminderHours)}h antes do horário.`,
+      });
+      
+      setIsReminderDialogOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "Erro ao criar lembrete",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingReminder(false);
+    }
+  };
+
+  const sendReminderNow = async (appointment: Appointment, message: string) => {
+    if (!appointment.client_whatsapp) return;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('send-reminder', {
+        body: {
+          client_name: appointment.client_name,
+          client_whatsapp: appointment.client_whatsapp,
+          message,
+          appointment_id: appointment.id
+        }
+      });
+
+      if (error) throw error;
+      
+      // Open WhatsApp with the message
+      if (data?.whatsappUrl) {
+        window.open(data.whatsappUrl, '_blank');
+      }
+    } catch (error) {
+      console.error('Error sending reminder:', error);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -379,16 +512,26 @@ export default function Agendamentos() {
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {agendamento.client_whatsapp && (
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => handleWhatsApp(agendamento.client_whatsapp!, agendamento.client_name)}
-                        >
-                          <MessageSquare className="w-4 h-4 mr-1" />
-                          WhatsApp
-                        </Button>
+                        <>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => handleWhatsApp(agendamento.client_whatsapp!, agendamento.client_name)}
+                          >
+                            <MessageSquare className="w-4 h-4 mr-1" />
+                            WhatsApp
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openReminderDialog(agendamento)}
+                            title="Agendar lembrete"
+                          >
+                            <Bell className="w-4 h-4" />
+                          </Button>
+                        </>
                       )}
                       {agendamento.status === "pending" && (
                         <>
@@ -425,6 +568,70 @@ export default function Agendamentos() {
               ))
           )}
         </motion.div>
+
+        {/* Reminder Dialog */}
+        <Dialog open={isReminderDialogOpen} onOpenChange={setIsReminderDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Bell className="w-5 h-5" />
+                Agendar Lembrete
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              {selectedAppointment && (
+                <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+                  <p className="font-medium">{selectedAppointment.client_name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {new Date(selectedAppointment.date + "T00:00:00").toLocaleDateString("pt-BR")} às {selectedAppointment.time}
+                  </p>
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <Label>Enviar lembrete</Label>
+                <Select value={reminderHours} onValueChange={setReminderHours}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 hora antes</SelectItem>
+                    <SelectItem value="2">2 horas antes</SelectItem>
+                    <SelectItem value="4">4 horas antes</SelectItem>
+                    <SelectItem value="12">12 horas antes</SelectItem>
+                    <SelectItem value="24">24 horas antes</SelectItem>
+                    <SelectItem value="48">48 horas antes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <Button 
+                  variant="outline" 
+                  className="flex-1" 
+                  onClick={() => setIsReminderDialogOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  variant="hero" 
+                  className="flex-1"
+                  onClick={handleCreateReminder}
+                  disabled={isSendingReminder}
+                >
+                  {isSendingReminder ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Bell className="w-4 h-4 mr-2" />
+                      Agendar Lembrete
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
