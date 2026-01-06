@@ -39,29 +39,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    return { error: error as Error | null };
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      return { error: (error as Error | null) ?? null };
+    } catch (err: any) {
+      return {
+        error:
+          err instanceof Error
+            ? err
+            : new Error("Falha ao conectar. Verifique sua internet e tente novamente."),
+      };
+    }
   };
 
-  const signUp = async (email: string, password: string, metadata?: { name?: string; phone?: string }) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    metadata?: { name?: string; phone?: string }
+  ) => {
     const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: metadata,
-      },
-    });
-    return { error: error as Error | null };
+
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: metadata,
+        },
+      });
+      return { error: (error as Error | null) ?? null };
+    } catch (err: any) {
+      return {
+        error:
+          err instanceof Error
+            ? err
+            : new Error("Falha ao conectar. Tente novamente em instantes."),
+      };
+    }
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // não quebra o app
+    }
   };
 
   return (

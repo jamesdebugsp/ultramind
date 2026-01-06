@@ -67,22 +67,25 @@ export default function Configuracoes() {
   };
 
   const handleSave = async () => {
+    if (isSaving) return;
+
     setIsSaving(true);
-    
-    await updateProfile({
-      business_name: formData.business_name || null,
-      whatsapp: formData.whatsapp || null,
-      instagram: formData.instagram || null,
-      address: formData.address || null,
-      description: formData.description || null,
-    });
-    
-    await updateSettings({
-      send_reminders: notifications.send_reminders,
-      auto_confirm: notifications.auto_confirm,
-    });
-    
-    setIsSaving(false);
+    try {
+      await updateProfile({
+        business_name: formData.business_name || null,
+        whatsapp: formData.whatsapp || null,
+        instagram: formData.instagram || null,
+        address: formData.address || null,
+        description: formData.description || null,
+      });
+
+      await updateSettings({
+        send_reminders: notifications.send_reminders,
+        auto_confirm: notifications.auto_confirm,
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const loading = profileLoading || settingsLoading;

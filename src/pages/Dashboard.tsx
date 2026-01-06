@@ -34,6 +34,9 @@ export default function Dashboard() {
   const loading = profileLoading || servicesLoading || clientsLoading || appointmentsLoading;
 
   const businessSlug = useMemo(() => {
+    // prioriza slug personalizado do perfil
+    if (profile?.slug) return profile.slug;
+
     if (!profile?.business_name) return "meu-negocio";
     return profile.business_name
       .toLowerCase()
@@ -41,7 +44,7 @@ export default function Dashboard() {
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
-  }, [profile?.business_name]);
+  }, [profile?.slug, profile?.business_name]);
 
   const bookingUrl = `${window.location.origin}/agendar/${businessSlug}`;
 
