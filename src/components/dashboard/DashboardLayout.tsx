@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRoles } from "@/hooks/useUserRoles";
 
-const sidebarLinks = [
+const mainLinks = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: Calendar, label: "Agendamentos", href: "/dashboard/agendamentos" },
   { icon: Users, label: "Clientes", href: "/dashboard/clientes" },
@@ -111,7 +111,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-            {sidebarLinks.map((link) => {
+            {mainLinks.map((link) => {
               const isActive = location.pathname === link.href;
               return (
                 <Link
@@ -130,6 +130,23 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 </Link>
               );
             })}
+            
+            {/* Admin link - only for super_admin */}
+            {isSuperAdmin && (
+              <Link
+                to="/dashboard/admin"
+                onClick={() => setSidebarOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                  location.pathname === "/dashboard/admin"
+                    ? "bg-highlight/10 text-highlight"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <Shield className="w-5 h-5" />
+                Admin
+              </Link>
+            )}
           </nav>
 
           {/* User Section */}

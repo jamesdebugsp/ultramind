@@ -8,7 +8,9 @@ import {
   CheckCircle2,
   XCircle,
   Calendar,
-  Edit2
+  Edit2,
+  Lock,
+  Crown
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +19,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useToast } from "@/hooks/use-toast";
+import { useSubscription } from "@/hooks/useSubscription";
+import { useNavigate } from "react-router-dom";
 
 interface MessageTemplate {
   id: string;
@@ -147,8 +151,21 @@ export default function BotWhatsApp() {
   const [templates, setTemplates] = useState<MessageTemplate[]>(initialTemplates);
   const [editingTemplate, setEditingTemplate] = useState<string | null>(null);
   const { toast } = useToast();
+  const { subscription, canUseFeature, loading: subscriptionLoading } = useSubscription();
+  const navigate = useNavigate();
+
+  const whatsappEnabled = canUseFeature('whatsapp');
+  const remindersEnabled = canUseFeature('reminders');
 
   const toggleTemplate = (id: string) => {
+    if (!whatsappEnabled) {
+      toast({
+        title: "Recurso bloqueado",
+        description: "Faça upgrade para PRO ou PREMIUM para usar o Bot WhatsApp.",
+        variant: "destructive",
+      });
+      return;
+    }
     setTemplates(templates.map(t => 
       t.id === id ? { ...t, enabled: !t.enabled } : t
     ));
@@ -171,6 +188,35 @@ export default function BotWhatsApp() {
   return (
     <DashboardLayout>
       <div className="p-4 lg:p-8">
+        {/* Upgrade Banner if not enabled */}
+        {!whatsappEnabled && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8"
+          >
+            <Card variant="elevated" className="p-6 bg-amber-500/10 border-amber-500/20">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                  <Lock className="w-6 h-6 text-amber-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-foreground mb-1">
+                    Recurso disponível nos planos PRO e PREMIUM
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Faça upgrade para enviar mensagens automáticas via WhatsApp.
+                  </p>
+                </div>
+                <Button variant="hero" onClick={() => navigate('/dashboard/planos')}>
+                  <Crown className="w-4 h-4 mr-2" />
+                  Fazer Upgrade
+                </Button>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -185,7 +231,7 @@ export default function BotWhatsApp() {
               Configure as mensagens automáticas
             </p>
           </div>
-          <Button variant="hero" onClick={handleSave}>
+          <Button variant="hero" onClick={handleSave} disabled={!whatsappEnabled}>
             <Save className="w-4 h-4 mr-2" />
             Salvar Alterações
           </Button>
