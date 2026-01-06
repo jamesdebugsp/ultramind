@@ -1,25 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./types";
 
-// Lovable Cloud fornece estas variáveis automaticamente
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-// Preferir VITE_SUPABASE_ANON_KEY; manter compatibilidade com VITE_SUPABASE_PUBLISHABLE_KEY
-const SUPABASE_ANON_KEY = (
-  import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
-) as string | undefined;
+// Lovable Cloud - credenciais do projeto
+const SUPABASE_URL = "https://qlelriizivotepmgbtuo.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsZWxyaWl6aXZvdGVwbWdidHVvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU2MjQ2MDgsImV4cCI6MjA4MTIwMDYwOH0.2B8MnaXcwFisXopZlGvevGEeqXedqu0VePU_UxhYNmU";
 
-export const isBackendConfigured = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+export const isBackendConfigured = true;
 
-if (!isBackendConfigured) {
-  console.error("❌ Backend env vars missing", {
-    hasUrl: Boolean(SUPABASE_URL),
-    hasAnonKey: Boolean(SUPABASE_ANON_KEY),
-  });
-}
-
-// Nunca aponta para localhost; fallback só evita crash em tempo de importação
-const SAFE_URL = SUPABASE_URL ?? "https://placeholder.supabase.co";
-const SAFE_KEY = SUPABASE_ANON_KEY ?? "placeholder-key";
-
-export const supabase = createClient<Database>(SAFE_URL, SAFE_KEY);
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY);
 
