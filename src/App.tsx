@@ -25,6 +25,8 @@ import MinhaPagina from "./pages/dashboard/MinhaPagina";
 import Configuracoes from "./pages/dashboard/Configuracoes";
 import AdminPanel from "./pages/dashboard/AdminPanel";
 import Planos from "./pages/dashboard/Planos";
+import OwnerDashboard from "./pages/dashboard/OwnerDashboard";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -136,6 +138,14 @@ const App = () => (
                 element={
                   <PrivateRoute>
                     <AdminPanel />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/owner"
+                element={
+                  <PrivateRoute>
+                    <OwnerDashboard />
                   </PrivateRoute>
                 }
               />
