@@ -71,20 +71,27 @@ export default function MinhaPagina() {
       return false;
     }
 
-    // Check if slug is already in use by another user
-    const { data } = await supabase
-      .from('profiles')
-      .select('user_id')
-      .eq('slug', slug)
-      .maybeSingle();
+    try {
+      // Check if slug is already in use by another user
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("user_id")
+        .eq("slug", slug)
+        .maybeSingle();
 
-    if (data && data.user_id !== profile?.user_id) {
-      setSlugError("Este link já está em uso");
+      if (error) throw error;
+
+      if (data && data.user_id !== profile?.user_id) {
+        setSlugError("Este link já está em uso");
+        return false;
+      }
+
+      setSlugError("");
+      return true;
+    } catch {
+      setSlugError("Não foi possível validar o link agora. Tente novamente.");
       return false;
     }
-
-    setSlugError("");
-    return true;
   };
 
   const handleSlugChange = (value: string) => {
@@ -102,8 +109,12 @@ export default function MinhaPagina() {
       await updateProfile({ slug: slugInput });
       setIsEditing(false);
       await refetch();
-    } catch (error) {
-      console.error('Error saving slug:', error);
+    } catch {
+      toast({
+        title: "Erro ao salvar",
+        description: "Tente novamente em instantes.",
+        variant: "destructive",
+      });
     } finally {
       setIsSaving(false);
     }

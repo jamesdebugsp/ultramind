@@ -130,8 +130,19 @@ export default function PublicBooking() {
   const loadBusinessData = async () => {
     setLoading(true);
 
+    const normalizedSlug = typeof slug === "string" ? slug.trim().toLowerCase() : "";
+
     // Validação obrigatória do param
-    if (!slug || typeof slug !== "string" || !slug.trim()) {
+    if (!normalizedSlug) {
+      setBusinessData(null);
+      setServices([]);
+      setSettings(DEFAULT_SETTINGS);
+      setLoading(false);
+      return;
+    }
+
+    // Protege contra slug inválido (evita quebrar render / queries)
+    if (!/^[a-z0-9-]+$/.test(normalizedSlug)) {
       setBusinessData(null);
       setServices([]);
       setSettings(DEFAULT_SETTINGS);
@@ -144,7 +155,7 @@ export default function PublicBooking() {
       let { data: profileBySlug, error: slugError } = await supabase
         .from("profiles")
         .select("*")
-        .eq("slug", slug)
+        .eq("slug", normalizedSlug)
         .maybeSingle();
 
       if (slugError) throw slugError;
@@ -168,7 +179,7 @@ export default function PublicBooking() {
               .replace(/[\u0300-\u036f]/g, "")
               .replace(/[^a-z0-9]+/g, "-")
               .replace(/^-|-$/g, "");
-            return profileSlug === slug;
+            return profileSlug === normalizedSlug;
           }) || null;
       }
 
