@@ -18,6 +18,7 @@ import {
   Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserRoles } from "@/hooks/useUserRoles";
@@ -131,21 +132,40 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               );
             })}
             
-            {/* Admin link - only for super_admin */}
+            {/* Admin/Owner links - only for super_admin */}
             {isSuperAdmin && (
-              <Link
-                to="/dashboard/admin"
-                onClick={() => setSidebarOpen(false)}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                  location.pathname === "/dashboard/admin"
-                    ? "bg-highlight/10 text-highlight"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                )}
-              >
-                <Shield className="w-5 h-5" />
-                Admin
-              </Link>
+              <>
+                <Separator className="my-2" />
+                <p className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  Administração
+                </p>
+                <Link
+                  to="/owner"
+                  onClick={() => setSidebarOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                    location.pathname === "/owner"
+                      ? "bg-highlight/10 text-highlight"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <Crown className="w-5 h-5" />
+                  Painel do Dono
+                </Link>
+                <Link
+                  to="/dashboard/admin"
+                  onClick={() => setSidebarOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                    location.pathname === "/dashboard/admin"
+                      ? "bg-highlight/10 text-highlight"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <Shield className="w-5 h-5" />
+                  Admin
+                </Link>
+              </>
             )}
           </nav>
 
