@@ -23,7 +23,8 @@ import BotWhatsApp from "./pages/dashboard/BotWhatsApp";
 import Relatorios from "./pages/dashboard/Relatorios";
 import MinhaPagina from "./pages/dashboard/MinhaPagina";
 import Configuracoes from "./pages/dashboard/Configuracoes";
-
+import AdminPanel from "./pages/dashboard/AdminPanel";
+import Planos from "./pages/dashboard/Planos";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -119,6 +120,22 @@ const App = () => (
                 element={
                   <PrivateRoute>
                     <Configuracoes />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/dashboard/planos"
+                element={
+                  <PrivateRoute>
+                    <Planos />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/dashboard/admin"
+                element={
+                  <PrivateRoute>
+                    <AdminPanel />
                   </PrivateRoute>
                 }
               />

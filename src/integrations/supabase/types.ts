@@ -197,6 +197,50 @@ export type Database = {
         }
         Relationships: []
       }
+      reminders: {
+        Row: {
+          appointment_id: string
+          created_at: string
+          id: string
+          message: string | null
+          reminder_type: string
+          scheduled_for: string
+          sent_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          appointment_id: string
+          created_at?: string
+          id?: string
+          message?: string | null
+          reminder_type?: string
+          scheduled_for: string
+          sent_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          appointment_id?: string
+          created_at?: string
+          id?: string
+          message?: string | null
+          reminder_type?: string
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminders_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       services: {
         Row: {
           created_at: string
@@ -281,15 +325,113 @@ export type Database = {
         }
         Relationships: []
       }
+      subscriptions: {
+        Row: {
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          max_appointments: number
+          plan: Database["public"]["Enums"]["subscription_plan"]
+          reminders_enabled: boolean
+          status: Database["public"]["Enums"]["subscription_status"]
+          trial_ends_at: string | null
+          updated_at: string
+          user_id: string
+          whatsapp_enabled: boolean
+        }
+        Insert: {
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          max_appointments?: number
+          plan?: Database["public"]["Enums"]["subscription_plan"]
+          reminders_enabled?: boolean
+          status?: Database["public"]["Enums"]["subscription_status"]
+          trial_ends_at?: string | null
+          updated_at?: string
+          user_id: string
+          whatsapp_enabled?: boolean
+        }
+        Update: {
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          max_appointments?: number
+          plan?: Database["public"]["Enums"]["subscription_plan"]
+          reminders_enabled?: boolean
+          status?: Database["public"]["Enums"]["subscription_status"]
+          trial_ends_at?: string | null
+          updated_at?: string
+          user_id?: string
+          whatsapp_enabled?: boolean
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_subscription: {
+        Args: { _user_id: string }
+        Returns: {
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          max_appointments: number
+          plan: Database["public"]["Enums"]["subscription_plan"]
+          reminders_enabled: boolean
+          status: Database["public"]["Enums"]["subscription_status"]
+          trial_ends_at: string | null
+          updated_at: string
+          user_id: string
+          whatsapp_enabled: boolean
+        }
+        SetofOptions: {
+          from: "*"
+          to: "subscriptions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "super_admin" | "admin" | "user"
+      subscription_plan: "basic" | "pro" | "premium"
+      subscription_status: "active" | "trial" | "inactive" | "cancelled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -416,6 +558,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["super_admin", "admin", "user"],
+      subscription_plan: ["basic", "pro", "premium"],
+      subscription_status: ["active", "trial", "inactive", "cancelled"],
+    },
   },
 } as const
