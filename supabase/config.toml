@@ -1,4 +1,7 @@
-project_id = "dhwbqtxzjenyudtblxxz"
+project_id = "qlelriizivotepmgbtuo"
 
 [functions.send-whatsapp-confirmation]
+verify_jwt = false
+
+[functions.send-reminder]
 verify_jwt = false

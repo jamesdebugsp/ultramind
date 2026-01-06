@@ -13,11 +13,14 @@ import {
   LogOut,
   Menu,
   X,
-  Scissors
+  Scissors,
+  Crown,
+  Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserRoles } from "@/hooks/useUserRoles";
 
 const sidebarLinks = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
@@ -28,6 +31,7 @@ const sidebarLinks = [
   { icon: MessageSquare, label: "Bot WhatsApp", href: "/dashboard/bot" },
   { icon: BarChart3, label: "Relatórios", href: "/dashboard/relatorios" },
   { icon: QrCode, label: "Minha Página", href: "/dashboard/pagina" },
+  { icon: Crown, label: "Planos", href: "/dashboard/planos" },
   { icon: Settings, label: "Configurações", href: "/dashboard/configuracoes" },
 ];
 
@@ -40,6 +44,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
+  const { isSuperAdmin } = useUserRoles();
 
   const handleLogout = async () => {
     await signOut();
