@@ -393,6 +393,27 @@ export type Database = {
       }
     }
     Views: {
+      appointment_availability: {
+        Row: {
+          date: string | null
+          status: string | null
+          time: string | null
+          user_id: string | null
+        }
+        Insert: {
+          date?: string | null
+          status?: string | null
+          time?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          date?: string | null
+          status?: string | null
+          time?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       public_business_info: {
         Row: {
           address: string | null
@@ -428,6 +449,17 @@ export type Database = {
       }
     }
     Functions: {
+      create_public_appointment: {
+        Args: {
+          p_client_name: string
+          p_client_whatsapp: string
+          p_date: string
+          p_service_id: string
+          p_time: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       get_user_subscription: {
         Args: { _user_id: string }
         Returns: {
