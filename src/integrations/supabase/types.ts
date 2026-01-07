@@ -393,7 +393,39 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      public_business_info: {
+        Row: {
+          address: string | null
+          business_name: string | null
+          description: string | null
+          id: string | null
+          instagram: string | null
+          logo_url: string | null
+          slug: string | null
+          user_id: string | null
+        }
+        Insert: {
+          address?: string | null
+          business_name?: string | null
+          description?: string | null
+          id?: string | null
+          instagram?: string | null
+          logo_url?: string | null
+          slug?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          address?: string | null
+          business_name?: string | null
+          description?: string | null
+          id?: string | null
+          instagram?: string | null
+          logo_url?: string | null
+          slug?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       get_user_subscription: {
