@@ -151,9 +151,10 @@ export default function PublicBooking() {
     }
 
     try {
+      // Use public_business_info view to avoid exposing PII
       // First try to find by exact slug match
       let { data: profileBySlug, error: slugError } = await supabase
-        .from("profiles")
+        .from("public_business_info")
         .select("*")
         .eq("slug", normalizedSlug)
         .maybeSingle();
@@ -165,9 +166,8 @@ export default function PublicBooking() {
       // If no slug match, fallback to business_name-derived slug
       if (!matchingProfile) {
         const { data: profiles, error: profileError } = await supabase
-          .from("profiles")
-          .select("*")
-          .not("business_name", "is", null);
+          .from("public_business_info")
+          .select("*");
 
         if (profileError) throw profileError;
 
@@ -181,6 +181,20 @@ export default function PublicBooking() {
               .replace(/^-|-$/g, "");
             return profileSlug === normalizedSlug;
           }) || null;
+      }
+
+      // If we found a match, also fetch the whatsapp separately for the business owner display
+      // Note: This is only used for the "Falar com" button, not exposed in the page
+      if (matchingProfile) {
+        const { data: fullProfile } = await supabase
+          .from("profiles")
+          .select("whatsapp")
+          .eq("user_id", matchingProfile.user_id)
+          .maybeSingle();
+        
+        if (fullProfile?.whatsapp) {
+          matchingProfile = { ...matchingProfile, whatsapp: fullProfile.whatsapp };
+        }
       }
 
       if (matchingProfile) {
