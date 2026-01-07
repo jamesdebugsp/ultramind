@@ -291,7 +291,7 @@ export default function PublicBooking() {
     setIsSubmitting(true);
     
     try {
-      // Insert appointment
+      // Insert appointment with confirmed status
       const { data: appointmentData, error: insertError } = await supabase
         .from('appointments')
         .insert({
@@ -309,22 +309,27 @@ export default function PublicBooking() {
 
       if (insertError) throw insertError;
 
-      // Call edge function for WhatsApp confirmation
+      // Send automatic WhatsApp confirmation to client AND business owner
       try {
-        const { data: confirmData } = await supabase.functions.invoke('send-whatsapp-confirmation', {
+        const { data: confirmData, error: fnError } = await supabase.functions.invoke('send-whatsapp-confirmation', {
           body: {
             appointment_id: appointmentData.id,
             client_name: clientData.name.trim(),
             client_whatsapp: phoneDigits,
             business_name: businessData.business_name,
-            business_whatsapp: businessData.whatsapp,
+            business_whatsapp: businessData.whatsapp?.replace(/\D/g, '') || null,
             service_name: service.name,
             date: selectedDate,
             time: selectedTime
           }
         });
 
-        setConfirmationData(confirmData);
+        if (fnError) {
+          console.error('Edge function error:', fnError);
+        } else {
+          console.log('WhatsApp confirmation result:', confirmData);
+          setConfirmationData(confirmData);
+        }
       } catch (fnError) {
         console.error('Edge function error:', fnError);
       }
