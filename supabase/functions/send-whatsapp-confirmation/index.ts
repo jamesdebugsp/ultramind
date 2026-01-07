@@ -6,15 +6,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Time window in minutes for public booking confirmations (no auth)
+const PUBLIC_CONFIRMATION_WINDOW_MINUTES = 5;
+
 interface AppointmentConfirmation {
   appointment_id: string;
-  client_name: string;
-  client_whatsapp: string;
-  business_name: string;
-  business_whatsapp: string;
-  service_name: string;
-  date: string;
-  time: string;
+  client_name?: string;
+  client_whatsapp?: string;
+  business_name?: string;
+  business_whatsapp?: string;
+  service_name?: string;
+  date?: string;
+  time?: string;
 }
 
 function formatPhone(phone: string): string {
@@ -40,29 +43,29 @@ function formatDate(dateStr: string): string {
   });
 }
 
-function generateClientMessage(data: AppointmentConfirmation): string {
+function generateClientMessage(clientName: string, businessName: string, dateStr: string, time: string, serviceName: string): string {
   return `✅ *Agendamento confirmado!*
 
-Olá ${data.client_name}, seu horário foi confirmado com sucesso.
+Olá ${clientName}, seu horário foi confirmado com sucesso.
 
-🏢 *${data.business_name}*
-🗓 *Data:* ${formatDate(data.date)}
-⏰ *Horário:* ${data.time}
-💼 *Serviço:* ${data.service_name}
+🏢 *${businessName}*
+🗓 *Data:* ${formatDate(dateStr)}
+⏰ *Horário:* ${time}
+💼 *Serviço:* ${serviceName}
 
 Qualquer dúvida, estamos à disposição no WhatsApp.
 
 _Agendamento realizado via UltraMind_`;
 }
 
-function generateBusinessMessage(data: AppointmentConfirmation): string {
+function generateBusinessMessage(clientName: string, clientWhatsapp: string, dateStr: string, time: string, serviceName: string): string {
   return `📢 *Novo agendamento!*
 
-👤 *Cliente:* ${data.client_name}
-📞 *WhatsApp:* ${data.client_whatsapp}
-🗓 *Data:* ${formatDate(data.date)}
-⏰ *Horário:* ${data.time}
-💼 *Serviço:* ${data.service_name}
+👤 *Cliente:* ${clientName}
+📞 *WhatsApp:* ${clientWhatsapp}
+🗓 *Data:* ${formatDate(dateStr)}
+⏰ *Horário:* ${time}
+💼 *Serviço:* ${serviceName}
 
 _Notificação automática UltraMind_`;
 }
@@ -126,20 +129,121 @@ const handler = async (req: Request): Promise<Response> => {
 
     const payload: AppointmentConfirmation = await req.json();
     
-    console.log("Processing appointment confirmation:", payload);
+    console.log("Processing appointment confirmation request");
 
-    // Validate required fields
-    if (!payload.client_name || !payload.client_whatsapp || !payload.business_name || !payload.service_name || !payload.date || !payload.time) {
-      throw new Error("Missing required fields for confirmation");
+    // Validate appointment_id is required
+    if (!payload.appointment_id) {
+      return new Response(
+        JSON.stringify({ error: "appointment_id is required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    // Generate messages
-    const clientMessage = generateClientMessage(payload);
-    const businessMessage = generateBusinessMessage(payload);
+    // Check for authenticated user
+    const authHeader = req.headers.get("Authorization");
+    let isAuthenticated = false;
+    let authenticatedUserId: string | null = null;
+
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.replace("Bearer ", "");
+      const { data: userData, error: authError } = await supabase.auth.getUser(token);
+      
+      if (!authError && userData?.user) {
+        isAuthenticated = true;
+        authenticatedUserId = userData.user.id;
+        console.log("Authenticated request from user:", authenticatedUserId);
+      }
+    }
+
+    // Fetch appointment data from database to verify it exists and get accurate data
+    const { data: appointment, error: appointmentError } = await supabase
+      .from("appointments")
+      .select(`
+        id,
+        user_id,
+        client_name,
+        client_whatsapp,
+        date,
+        time,
+        status,
+        created_at,
+        service_id,
+        services:service_id (name)
+      `)
+      .eq("id", payload.appointment_id)
+      .single();
+
+    if (appointmentError || !appointment) {
+      console.error("Appointment not found:", appointmentError);
+      return new Response(
+        JSON.stringify({ error: "Appointment not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Authorization check
+    if (isAuthenticated) {
+      // Authenticated users must own the appointment
+      if (appointment.user_id !== authenticatedUserId) {
+        console.error("User does not own this appointment");
+        return new Response(
+          JSON.stringify({ error: "Unauthorized - you do not own this appointment" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      console.log("Authorization passed: authenticated user owns appointment");
+    } else {
+      // For unauthenticated requests, verify appointment was created recently
+      // This prevents abuse by only allowing confirmation for recently created appointments
+      const createdAt = new Date(appointment.created_at);
+      const now = new Date();
+      const minutesSinceCreation = (now.getTime() - createdAt.getTime()) / (1000 * 60);
+
+      if (minutesSinceCreation > PUBLIC_CONFIRMATION_WINDOW_MINUTES) {
+        console.error(`Appointment too old for public confirmation: ${minutesSinceCreation.toFixed(1)} minutes`);
+        return new Response(
+          JSON.stringify({ error: "Confirmation window expired. Please contact the business directly." }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      console.log(`Authorization passed: appointment created ${minutesSinceCreation.toFixed(1)} minutes ago`);
+    }
+
+    // Fetch business profile for the appointment owner
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("business_name, whatsapp")
+      .eq("user_id", appointment.user_id)
+      .single();
+
+    if (profileError) {
+      console.error("Profile not found:", profileError);
+    }
+
+    // Use data from database, not from client payload (except as fallback for business info)
+    const clientName = appointment.client_name;
+    const clientWhatsapp = appointment.client_whatsapp;
+    const businessName = profile?.business_name || payload.business_name || "Estabelecimento";
+    const businessWhatsapp = profile?.whatsapp || payload.business_whatsapp;
+    const serviceName = (appointment.services as any)?.name || payload.service_name || "Serviço";
+    const appointmentDate = appointment.date;
+    const appointmentTime = appointment.time;
+
+    if (!clientWhatsapp) {
+      console.error("No client WhatsApp available");
+      return new Response(
+        JSON.stringify({ error: "No client WhatsApp available for this appointment" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Generate messages using verified database data
+    const clientMessage = generateClientMessage(clientName, businessName, appointmentDate, appointmentTime, serviceName);
+    const businessMessage = generateBusinessMessage(clientName, clientWhatsapp, appointmentDate, appointmentTime, serviceName);
 
     // Send WhatsApp to client
-    console.log("Sending WhatsApp to client:", payload.client_whatsapp);
-    const clientResult = await sendTwilioWhatsApp(payload.client_whatsapp, clientMessage);
+    console.log("Sending WhatsApp to client:", clientWhatsapp);
+    const clientResult = await sendTwilioWhatsApp(clientWhatsapp, clientMessage);
     
     if (!clientResult.success) {
       console.error("Failed to send to client:", clientResult.error);
@@ -147,9 +251,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send WhatsApp to business owner
     let businessResult: { success: boolean; error?: string } = { success: false, error: "No business WhatsApp" };
-    if (payload.business_whatsapp) {
-      console.log("Sending WhatsApp to business:", payload.business_whatsapp);
-      businessResult = await sendTwilioWhatsApp(payload.business_whatsapp, businessMessage);
+    if (businessWhatsapp) {
+      console.log("Sending WhatsApp to business:", businessWhatsapp);
+      businessResult = await sendTwilioWhatsApp(businessWhatsapp, businessMessage);
       
       if (!businessResult.success) {
         console.error("Failed to send to business:", businessResult.error);
@@ -157,18 +261,16 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Update appointment status to confirmed
-    if (payload.appointment_id) {
-      const { error: updateError } = await supabase
-        .from("appointments")
-        .update({ 
-          status: "confirmado",
-          confirmed_at: new Date().toISOString()
-        })
-        .eq("id", payload.appointment_id);
+    const { error: updateError } = await supabase
+      .from("appointments")
+      .update({ 
+        status: "confirmado",
+        confirmed_at: new Date().toISOString()
+      })
+      .eq("id", payload.appointment_id);
 
-      if (updateError) {
-        console.error("Error updating appointment:", updateError);
-      }
+    if (updateError) {
+      console.error("Error updating appointment:", updateError);
     }
 
     console.log("Confirmation processed successfully");
