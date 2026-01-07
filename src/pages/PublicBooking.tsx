@@ -254,12 +254,12 @@ export default function PublicBooking() {
     if (!businessData) return;
     
     try {
+      // Use the secure appointment_availability view (no PII exposed)
       const { data } = await supabase
-        .from('appointments')
+        .from('appointment_availability')
         .select('date, time')
         .eq('user_id', businessData.user_id)
-        .eq('date', date)
-        .neq('status', 'cancelado');
+        .eq('date', date);
 
       setExistingAppointments(data || []);
     } catch (error) {
@@ -305,23 +305,22 @@ export default function PublicBooking() {
     setIsSubmitting(true);
     
     try {
-      // Insert appointment with confirmed status
-      const { data: appointmentData, error: insertError } = await supabase
-        .from('appointments')
-        .insert({
-          user_id: businessData.user_id,
-          client_name: clientData.name.trim(),
-          client_whatsapp: phoneDigits,
-          service_id: selectedService,
-          date: selectedDate,
-          time: selectedTime,
-          status: 'confirmado',
-          confirmed_at: new Date().toISOString()
-        })
-        .select()
-        .single();
+      // Use secure RPC function for public appointment creation
+      // This validates inputs server-side and prevents arbitrary user_id assignment
+      const { data: appointmentId, error: insertError } = await supabase
+        .rpc('create_public_appointment', {
+          p_user_id: businessData.user_id,
+          p_service_id: selectedService,
+          p_client_name: clientData.name.trim(),
+          p_client_whatsapp: phoneDigits,
+          p_date: selectedDate,
+          p_time: selectedTime
+        });
 
       if (insertError) throw insertError;
+
+      // Use the returned appointment ID
+      const appointmentData = { id: appointmentId };
 
       // Send automatic WhatsApp confirmation to client AND business owner
       try {
