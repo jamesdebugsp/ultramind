@@ -81,18 +81,71 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // 1. Authenticate the user from Authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error("Missing Authorization header");
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const payload: ReminderPayload = await req.json();
-
-    console.log("Processing reminder:", payload);
-
-    if (!payload.client_name || !payload.client_whatsapp || !payload.date || !payload.time) {
-      throw new Error("Missing required fields");
+    // Verify the JWT and get user
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      console.error("Invalid token:", authError);
+      return new Response(
+        JSON.stringify({ error: 'Invalid token' }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
+    const payload: ReminderPayload = await req.json();
+
+    console.log("Processing reminder for user:", user.id, "appointment:", payload.appointment_id);
+
+    // Validate required fields
+    if (!payload.client_name || !payload.client_whatsapp || !payload.date || !payload.time) {
+      console.error("Missing required fields in payload");
+      return new Response(
+        JSON.stringify({ error: "Missing required fields" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // 2. Verify appointment ownership BEFORE processing
+    if (payload.appointment_id) {
+      const { data: appointment, error: apptError } = await supabase
+        .from('appointments')
+        .select('user_id')
+        .eq('id', payload.appointment_id)
+        .single();
+
+      if (apptError || !appointment) {
+        console.error("Appointment not found:", payload.appointment_id);
+        return new Response(
+          JSON.stringify({ error: 'Appointment not found' }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (appointment.user_id !== user.id) {
+        console.error("Unauthorized: User", user.id, "does not own appointment", payload.appointment_id);
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized: You do not own this appointment' }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // 3. Process the reminder
     const reminderType = payload.reminder_type || 'reminder';
     const message = reminderType === 'confirmation' 
       ? generateConfirmationMessage(payload)
@@ -106,7 +159,7 @@ const handler = async (req: Request): Promise<Response> => {
         .from('reminders')
         .upsert({
           appointment_id: payload.appointment_id,
-          user_id: (await supabase.auth.getUser()).data.user?.id,
+          user_id: user.id, // Use authenticated user's ID
           reminder_type: 'whatsapp',
           scheduled_for: new Date().toISOString(),
           sent_at: new Date().toISOString(),
@@ -119,7 +172,7 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    console.log("Reminder processed successfully");
+    console.log("Reminder processed successfully for user:", user.id);
 
     return new Response(
       JSON.stringify({
@@ -132,10 +185,10 @@ const handler = async (req: Request): Promise<Response> => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in send-reminder:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: "Internal server error" }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

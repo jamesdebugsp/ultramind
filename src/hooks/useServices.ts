@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { serviceSchema, validateInput } from '@/lib/validation';
+import { getUserFriendlyError } from '@/lib/error-handler';
 
 export interface Service {
   id: string;
@@ -46,10 +48,29 @@ export function useServices() {
   const createService = async (service: Omit<Service, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
     if (!user) return { error: new Error('Not authenticated') };
 
+    // Validate input before database operation
+    const validation = validateInput(serviceSchema, service);
+    if (validation.success === false) {
+      toast({
+        title: "Dados inválidos",
+        description: validation.error,
+        variant: "destructive",
+      });
+      return { data: null, error: new Error(validation.error) };
+    }
+
     try {
+      const validatedData = validation.data;
       const { data, error } = await supabase
         .from('services')
-        .insert({ ...service, user_id: user.id })
+        .insert({ 
+          name: validatedData.name || service.name,
+          description: validatedData.description ?? service.description,
+          price: validatedData.price,
+          duration: validatedData.duration,
+          status: validatedData.status ?? service.status,
+          user_id: user.id 
+        })
         .select()
         .single();
 
@@ -62,10 +83,10 @@ export function useServices() {
       });
       
       return { data, error: null };
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao criar serviço",
-        description: error.message,
+        description: getUserFriendlyError(error),
         variant: "destructive",
       });
       return { data: null, error };
@@ -90,10 +111,10 @@ export function useServices() {
       });
       
       return { data, error: null };
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao atualizar",
-        description: error.message,
+        description: getUserFriendlyError(error),
         variant: "destructive",
       });
       return { data: null, error };
@@ -116,10 +137,10 @@ export function useServices() {
       });
       
       return { error: null };
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao excluir",
-        description: error.message,
+        description: getUserFriendlyError(error),
         variant: "destructive",
       });
       return { error };

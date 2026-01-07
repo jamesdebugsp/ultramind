@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { getUserFriendlyError } from "@/lib/error-handler";
 
 export interface Profile {
   id: string;
@@ -114,11 +115,11 @@ export function useProfile() {
       });
 
       return { data: data as Profile, error: null };
-    } catch (err: any) {
-      setError(err);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err : new Error('Unknown error'));
       toast({
         title: "Erro ao salvar",
-        description: err?.message || "Tente novamente.",
+        description: getUserFriendlyError(err),
         variant: "destructive",
       });
       return { data: null, error: err };

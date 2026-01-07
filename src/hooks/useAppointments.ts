@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { appointmentSchema, validateInput } from '@/lib/validation';
+import { getUserFriendlyError } from '@/lib/error-handler';
 
 export interface Appointment {
   id: string;
@@ -51,10 +53,33 @@ export function useAppointments() {
   const createAppointment = async (appointment: Omit<Appointment, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
     if (!user) return { error: new Error('Not authenticated') };
 
+    // Validate input before database operation
+    const validation = validateInput(appointmentSchema, appointment);
+    if (validation.success === false) {
+      toast({
+        title: "Dados inválidos",
+        description: validation.error,
+        variant: "destructive",
+      });
+      return { data: null, error: new Error(validation.error) };
+    }
+
     try {
+      const validatedData = validation.data;
       const { data, error } = await supabase
         .from('appointments')
-        .insert({ ...appointment, user_id: user.id })
+        .insert({ 
+          client_name: validatedData.client_name,
+          client_whatsapp: validatedData.client_whatsapp ?? null,
+          client_id: validatedData.client_id ?? null,
+          service_id: validatedData.service_id ?? null,
+          date: validatedData.date,
+          time: validatedData.time,
+          status: validatedData.status ?? 'pending',
+          notes: validatedData.notes ?? null,
+          confirmed_at: validatedData.confirmed_at ?? null,
+          user_id: user.id 
+        })
         .select()
         .single();
 
@@ -70,10 +95,10 @@ export function useAppointments() {
       });
       
       return { data, error: null };
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao agendar",
-        description: error.message,
+        description: getUserFriendlyError(error),
         variant: "destructive",
       });
       return { data: null, error };
@@ -105,10 +130,10 @@ export function useAppointments() {
       });
       
       return { data, error: null };
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao atualizar",
-        description: error.message,
+        description: getUserFriendlyError(error),
         variant: "destructive",
       });
       return { data: null, error };
@@ -131,10 +156,10 @@ export function useAppointments() {
       });
       
       return { error: null };
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Erro ao excluir",
-        description: error.message,
+        description: getUserFriendlyError(error),
         variant: "destructive",
       });
       return { error };
