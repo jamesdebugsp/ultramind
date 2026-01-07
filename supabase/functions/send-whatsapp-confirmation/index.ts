@@ -22,9 +22,12 @@ function formatPhone(phone: string): string {
   const cleaned = phone.replace(/\D/g, "");
   // Add Brazil country code if not present
   if (cleaned.length === 10 || cleaned.length === 11) {
-    return `55${cleaned}`;
+    return `+55${cleaned}`;
   }
-  return cleaned;
+  if (cleaned.startsWith("55") && cleaned.length >= 12) {
+    return `+${cleaned}`;
+  }
+  return `+${cleaned}`;
 }
 
 function formatDate(dateStr: string): string {
@@ -64,10 +67,50 @@ function generateBusinessMessage(data: AppointmentConfirmation): string {
 _Notificação automática UltraMind_`;
 }
 
-function generateWhatsAppUrl(phone: string, message: string): string {
-  const formattedPhone = formatPhone(phone);
-  const encodedMessage = encodeURIComponent(message);
-  return `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodedMessage}`;
+async function sendTwilioWhatsApp(to: string, body: string): Promise<{ success: boolean; error?: string }> {
+  const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
+  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+  const fromNumber = Deno.env.get("TWILIO_WHATSAPP_FROM");
+
+  if (!accountSid || !authToken || !fromNumber) {
+    console.error("Missing Twilio credentials");
+    return { success: false, error: "Twilio credentials not configured" };
+  }
+
+  const formattedTo = formatPhone(to);
+  const formattedFrom = fromNumber.startsWith("whatsapp:") ? fromNumber : `whatsapp:${fromNumber}`;
+  const formattedToWhatsApp = `whatsapp:${formattedTo}`;
+
+  try {
+    const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+    
+    const params = new URLSearchParams();
+    params.append("To", formattedToWhatsApp);
+    params.append("From", formattedFrom);
+    params.append("Body", body);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Authorization": `Basic ${btoa(`${accountSid}:${authToken}`)}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: params.toString(),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error("Twilio API error:", result);
+      return { success: false, error: result.message || "Failed to send WhatsApp" };
+    }
+
+    console.log("WhatsApp sent successfully:", result.sid);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error sending WhatsApp:", error);
+    return { success: false, error: error.message };
+  }
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -94,11 +137,24 @@ const handler = async (req: Request): Promise<Response> => {
     const clientMessage = generateClientMessage(payload);
     const businessMessage = generateBusinessMessage(payload);
 
-    // Generate WhatsApp URLs
-    const clientWhatsAppUrl = generateWhatsAppUrl(payload.client_whatsapp, clientMessage);
-    const businessWhatsAppUrl = payload.business_whatsapp 
-      ? generateWhatsAppUrl(payload.business_whatsapp, businessMessage)
-      : null;
+    // Send WhatsApp to client
+    console.log("Sending WhatsApp to client:", payload.client_whatsapp);
+    const clientResult = await sendTwilioWhatsApp(payload.client_whatsapp, clientMessage);
+    
+    if (!clientResult.success) {
+      console.error("Failed to send to client:", clientResult.error);
+    }
+
+    // Send WhatsApp to business owner
+    let businessResult: { success: boolean; error?: string } = { success: false, error: "No business WhatsApp" };
+    if (payload.business_whatsapp) {
+      console.log("Sending WhatsApp to business:", payload.business_whatsapp);
+      businessResult = await sendTwilioWhatsApp(payload.business_whatsapp, businessMessage);
+      
+      if (!businessResult.success) {
+        console.error("Failed to send to business:", businessResult.error);
+      }
+    }
 
     // Update appointment status to confirmed
     if (payload.appointment_id) {
@@ -120,10 +176,10 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(
       JSON.stringify({
         success: true,
-        clientWhatsAppUrl,
-        businessWhatsAppUrl,
-        clientMessage,
-        businessMessage,
+        clientMessageSent: clientResult.success,
+        businessMessageSent: businessResult.success,
+        clientError: clientResult.error,
+        businessError: businessResult.error,
       }),
       {
         status: 200,
