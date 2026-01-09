@@ -411,72 +411,134 @@ export default function PublicBooking() {
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="max-w-md w-full text-center"
+          transition={{ type: "spring", stiffness: 200, damping: 20 }}
+          className="max-w-md w-full"
         >
-          <div className="w-20 h-20 rounded-full bg-emerald-500 mx-auto mb-6 flex items-center justify-center">
-            <CheckCircle2 className="w-10 h-10 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">Agendamento Confirmado!</h1>
-          <p className="text-muted-foreground mb-6">Seu horário foi reservado com sucesso.</p>
-          
-          <Card className="p-6 mb-6 text-left">
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Estabelecimento:</span>
-                <span className="font-medium text-foreground">{businessData.business_name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Serviço:</span>
-                <span className="font-medium text-foreground">{service?.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Data:</span>
-                <span className="font-medium text-foreground">
-                  {new Date(selectedDate + "T12:00:00").toLocaleDateString("pt-BR", {
-                    weekday: 'long',
-                    day: '2-digit',
-                    month: 'long'
-                  })}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Horário:</span>
-                <span className="font-medium text-foreground">{selectedTime}</span>
-              </div>
-              {service && (
-                <div className="flex justify-between pt-2 border-t border-border">
-                  <span className="font-bold">Valor:</span>
-                  <span className="font-bold text-highlight">R$ {service.price.toFixed(2)}</span>
-                </div>
-              )}
+          {/* Success Header */}
+          <motion.div 
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, type: "spring", stiffness: 300 }}
+            className="text-center mb-6"
+          >
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 mx-auto mb-4 flex items-center justify-center shadow-lg shadow-emerald-500/30">
+              <CheckCircle2 className="w-12 h-12 text-white" />
             </div>
-          </Card>
+            <h1 className="text-2xl font-bold text-foreground mb-2">
+              ✅ Agendamento confirmado com sucesso!
+            </h1>
+            <p className="text-muted-foreground">
+              Você receberá uma confirmação no WhatsApp
+            </p>
+          </motion.div>
 
-          <div className="space-y-3">
-            {confirmationData?.clientWhatsAppUrl && (
-              <Button className="w-full" size="lg" asChild>
-                <a href={confirmationData.clientWhatsAppUrl} target="_blank" rel="noopener noreferrer">
-                  <MessageCircle className="w-5 h-5 mr-2" />
-                  Receber confirmação no WhatsApp
-                </a>
-              </Button>
-            )}
-            
+          {/* Confirmation Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <Card className="p-6 mb-6 border-2 border-emerald-500/20 bg-gradient-to-br from-emerald-500/5 to-transparent">
+              <div className="space-y-4">
+                {/* Business Name */}
+                <div className="flex items-start gap-3 pb-3 border-b border-border">
+                  <div className="w-10 h-10 rounded-lg bg-highlight/10 flex items-center justify-center shrink-0">
+                    <MapPin className="w-5 h-5 text-highlight" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Estabelecimento</p>
+                    <p className="font-semibold text-foreground">{businessData.business_name}</p>
+                  </div>
+                </div>
+
+                {/* Service */}
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-highlight/10 flex items-center justify-center shrink-0">
+                    <span className="text-lg">✂️</span>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Serviço</p>
+                    <p className="font-semibold text-foreground">{service?.name}</p>
+                  </div>
+                </div>
+
+                {/* Date */}
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-highlight/10 flex items-center justify-center shrink-0">
+                    <Calendar className="w-5 h-5 text-highlight" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Data</p>
+                    <p className="font-semibold text-foreground">
+                      {new Date(selectedDate + "T12:00:00").toLocaleDateString("pt-BR", {
+                        weekday: 'long',
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Time */}
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-highlight/10 flex items-center justify-center shrink-0">
+                    <Clock className="w-5 h-5 text-highlight" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Horário</p>
+                    <p className="font-semibold text-foreground text-lg">{selectedTime}</p>
+                  </div>
+                </div>
+
+                {/* Price */}
+                {service && (
+                  <div className="flex items-center justify-between pt-4 mt-2 border-t border-border">
+                    <span className="font-bold text-foreground">Valor total:</span>
+                    <span className="font-bold text-xl text-highlight">
+                      R$ {service.price.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </Card>
+          </motion.div>
+
+          {/* Action Buttons */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="space-y-3"
+          >
             {businessData.whatsapp && (
-              <Button variant="outline" className="w-full" size="lg" asChild>
+              <Button 
+                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white" 
+                size="lg" 
+                asChild
+              >
                 <a
-                  href={`https://api.whatsapp.com/send?phone=55${businessData.whatsapp.replace(/\D/g, '')}&text=Olá! Acabei de agendar um horário.`}
+                  href={`https://api.whatsapp.com/send?phone=55${businessData.whatsapp.replace(/\D/g, '')}&text=Olá! Acabei de confirmar meu agendamento para ${new Date(selectedDate + "T12:00:00").toLocaleDateString("pt-BR", { weekday: 'long', day: '2-digit', month: 'long' })} às ${selectedTime}.`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <Phone className="w-4 h-4 mr-2" />
+                  <MessageCircle className="w-5 h-5 mr-2" />
                   Falar com {businessData.business_name}
                 </a>
               </Button>
             )}
-          </div>
+            
+            {confirmationData?.clientWhatsAppUrl && (
+              <Button variant="outline" className="w-full" size="lg" asChild>
+                <a href={confirmationData.clientWhatsAppUrl} target="_blank" rel="noopener noreferrer">
+                  <Phone className="w-4 h-4 mr-2" />
+                  Receber confirmação no WhatsApp
+                </a>
+              </Button>
+            )}
+          </motion.div>
 
-          <p className="text-xs text-muted-foreground mt-6">
+          <p className="text-xs text-muted-foreground mt-6 text-center">
             Powered by <span className="text-highlight font-semibold">UltraMind</span>
           </p>
         </motion.div>
