@@ -44,28 +44,27 @@ function formatDate(dateStr: string): string {
 }
 
 function generateClientMessage(clientName: string, businessName: string, dateStr: string, time: string, serviceName: string): string {
-  return `✅ *Agendamento confirmado!*
+  return `✅ *Agendamento confirmado com sucesso!*
 
-Olá ${clientName}, seu horário foi confirmado com sucesso.
-
-🏢 *${businessName}*
-🗓 *Data:* ${formatDate(dateStr)}
+📅 *Data:* ${formatDate(dateStr)}
 ⏰ *Horário:* ${time}
-💼 *Serviço:* ${serviceName}
+✂️ *Serviço:* ${serviceName}
+📍 *${businessName}*
 
-Qualquer dúvida, estamos à disposição no WhatsApp.
+Obrigado por agendar com a gente, ${clientName}!
 
 _Agendamento realizado via UltraMind_`;
 }
 
 function generateBusinessMessage(clientName: string, clientWhatsapp: string, dateStr: string, time: string, serviceName: string): string {
-  return `📢 *Novo agendamento!*
+  const formattedPhone = clientWhatsapp.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+  return `📅 *Novo agendamento confirmado!*
 
 👤 *Cliente:* ${clientName}
-📞 *WhatsApp:* ${clientWhatsapp}
-🗓 *Data:* ${formatDate(dateStr)}
+📱 *WhatsApp:* ${formattedPhone}
+📅 *Data:* ${formatDate(dateStr)}
 ⏰ *Horário:* ${time}
-💼 *Serviço:* ${serviceName}
+✂️ *Serviço:* ${serviceName}
 
 _Notificação automática UltraMind_`;
 }
@@ -271,6 +270,42 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (updateError) {
       console.error("Error updating appointment:", updateError);
+    }
+
+    // Create automatic 24h reminder
+    const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
+    const reminderTime = new Date(appointmentDateTime.getTime() - 24 * 60 * 60 * 1000); // 24h before
+    
+    // Only create reminder if it's in the future
+    if (reminderTime > new Date()) {
+      const reminderMessage = `⏰ *Lembrete de agendamento*
+
+Seu horário é *amanhã* às *${appointmentTime}* para *${serviceName}*.
+
+📍 ${businessName}
+
+Confirme sua presença respondendo:
+✅ SIM - para confirmar
+❌ NÃO - para cancelar
+
+_Lembrete automático UltraMind_`;
+
+      const { error: reminderError } = await supabase
+        .from("reminders")
+        .insert({
+          appointment_id: payload.appointment_id,
+          user_id: appointment.user_id,
+          scheduled_for: reminderTime.toISOString(),
+          status: "pending",
+          reminder_type: "whatsapp",
+          message: reminderMessage,
+        });
+
+      if (reminderError) {
+        console.error("Error creating reminder:", reminderError);
+      } else {
+        console.log("24h reminder scheduled for:", reminderTime.toISOString());
+      }
     }
 
     console.log("Confirmation processed successfully");

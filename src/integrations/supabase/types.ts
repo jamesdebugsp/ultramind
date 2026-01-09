@@ -16,12 +16,15 @@ export type Database = {
     Tables: {
       appointments: {
         Row: {
+          calendar_event_id: string | null
+          calendar_synced_at: string | null
           client_id: string | null
           client_name: string
           client_whatsapp: string | null
           confirmed_at: string | null
           created_at: string
           date: string
+          duration_minutes: number | null
           id: string
           notes: string | null
           service_id: string | null
@@ -31,12 +34,15 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          calendar_event_id?: string | null
+          calendar_synced_at?: string | null
           client_id?: string | null
           client_name: string
           client_whatsapp?: string | null
           confirmed_at?: string | null
           created_at?: string
           date: string
+          duration_minutes?: number | null
           id?: string
           notes?: string | null
           service_id?: string | null
@@ -46,12 +52,15 @@ export type Database = {
           user_id: string
         }
         Update: {
+          calendar_event_id?: string | null
+          calendar_synced_at?: string | null
           client_id?: string | null
           client_name?: string
           client_whatsapp?: string | null
           confirmed_at?: string | null
           created_at?: string
           date?: string
+          duration_minutes?: number | null
           id?: string
           notes?: string | null
           service_id?: string | null
@@ -76,6 +85,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      calendar_integrations: {
+        Row: {
+          access_token: string | null
+          calendar_id: string | null
+          created_at: string
+          id: string
+          is_active: boolean | null
+          provider: string
+          refresh_token: string | null
+          token_expires_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          calendar_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          provider?: string
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          calendar_id?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          provider?: string
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       clients: {
         Row: {

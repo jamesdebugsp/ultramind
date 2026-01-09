@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.whatsapp-presence-webhook]
 verify_jwt = false
+
+[functions.process-scheduled-reminders]
+verify_jwt = false

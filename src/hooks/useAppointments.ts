@@ -19,6 +19,10 @@ export interface Appointment {
   confirmed_at: string | null;
   created_at: string;
   updated_at: string;
+  // Calendar integration fields
+  calendar_event_id: string | null;
+  calendar_synced_at: string | null;
+  duration_minutes: number | null;
 }
 
 export function useAppointments() {
@@ -50,7 +54,7 @@ export function useAppointments() {
     }
   };
 
-  const createAppointment = async (appointment: Omit<Appointment, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+  const createAppointment = async (appointment: Omit<Appointment, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'calendar_event_id' | 'calendar_synced_at' | 'duration_minutes'>) => {
     if (!user) return { error: new Error('Not authenticated') };
 
     // Validate input before database operation
