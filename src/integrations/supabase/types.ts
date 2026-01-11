@@ -86,6 +86,62 @@ export type Database = {
           },
         ]
       }
+      bot_conversations: {
+        Row: {
+          business_user_id: string
+          client_name: string | null
+          conversation_data: Json | null
+          created_at: string
+          current_step: string
+          expires_at: string | null
+          id: string
+          last_message_at: string | null
+          phone_number: string
+          selected_date: string | null
+          selected_service_id: string | null
+          selected_time: string | null
+          updated_at: string
+        }
+        Insert: {
+          business_user_id: string
+          client_name?: string | null
+          conversation_data?: Json | null
+          created_at?: string
+          current_step?: string
+          expires_at?: string | null
+          id?: string
+          last_message_at?: string | null
+          phone_number: string
+          selected_date?: string | null
+          selected_service_id?: string | null
+          selected_time?: string | null
+          updated_at?: string
+        }
+        Update: {
+          business_user_id?: string
+          client_name?: string | null
+          conversation_data?: Json | null
+          created_at?: string
+          current_step?: string
+          expires_at?: string | null
+          id?: string
+          last_message_at?: string | null
+          phone_number?: string
+          selected_date?: string | null
+          selected_service_id?: string | null
+          selected_time?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bot_conversations_selected_service_id_fkey"
+            columns: ["selected_service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_integrations: {
         Row: {
           access_token: string | null
@@ -506,6 +562,7 @@ export type Database = {
       }
     }
     Functions: {
+      clean_expired_conversations: { Args: never; Returns: number }
       create_public_appointment: {
         Args: {
           p_client_name: string
