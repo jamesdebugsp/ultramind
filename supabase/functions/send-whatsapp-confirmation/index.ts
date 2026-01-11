@@ -219,6 +219,18 @@ const handler = async (req: Request): Promise<Response> => {
       console.error("Profile not found:", profileError);
     }
 
+    // ========== BOT STATUS CHECK ==========
+    // Check if WhatsApp bot is active for this user before sending messages
+    const { data: botActive, error: botError } = await supabase
+      .rpc("is_whatsapp_bot_active", { p_user_id: appointment.user_id });
+
+    if (botError) {
+      console.error("Error checking bot status:", botError);
+    }
+
+    const shouldSendWhatsApp = botActive === true;
+    console.log(`Bot status for user ${appointment.user_id}: ${shouldSendWhatsApp ? 'ACTIVE' : 'INACTIVE'}`);
+
     // Use data from database, not from client payload (except as fallback for business info)
     const clientName = appointment.client_name;
     const clientWhatsapp = appointment.client_whatsapp;
@@ -228,11 +240,47 @@ const handler = async (req: Request): Promise<Response> => {
     const appointmentDate = appointment.date;
     const appointmentTime = appointment.time;
 
+    // Update appointment status to confirmed (always do this, regardless of bot status)
+    const { error: updateError } = await supabase
+      .from("appointments")
+      .update({ 
+        status: "confirmado",
+        confirmed_at: new Date().toISOString()
+      })
+      .eq("id", payload.appointment_id);
+
+    if (updateError) {
+      console.error("Error updating appointment:", updateError);
+    }
+
+    // If bot is not active, return early without sending WhatsApp
+    if (!shouldSendWhatsApp) {
+      console.log("WhatsApp bot is not active for this user. Skipping messages.");
+      return new Response(
+        JSON.stringify({
+          success: true,
+          botActive: false,
+          message: "Appointment confirmed. WhatsApp messages not sent (bot inactive).",
+          clientMessageSent: false,
+          businessMessageSent: false,
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     if (!clientWhatsapp) {
       console.error("No client WhatsApp available");
       return new Response(
-        JSON.stringify({ error: "No client WhatsApp available for this appointment" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ 
+          success: true,
+          error: "No client WhatsApp available for this appointment",
+          clientMessageSent: false,
+          businessMessageSent: false,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -257,19 +305,6 @@ const handler = async (req: Request): Promise<Response> => {
       if (!businessResult.success) {
         console.error("Failed to send to business:", businessResult.error);
       }
-    }
-
-    // Update appointment status to confirmed
-    const { error: updateError } = await supabase
-      .from("appointments")
-      .update({ 
-        status: "confirmado",
-        confirmed_at: new Date().toISOString()
-      })
-      .eq("id", payload.appointment_id);
-
-    if (updateError) {
-      console.error("Error updating appointment:", updateError);
     }
 
     // Create automatic 24h reminder
@@ -313,6 +348,7 @@ _Lembrete automático UltraMind_`;
     return new Response(
       JSON.stringify({
         success: true,
+        botActive: true,
         clientMessageSent: clientResult.success,
         businessMessageSent: businessResult.success,
         clientError: clientResult.error,

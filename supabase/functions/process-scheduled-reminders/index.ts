@@ -169,6 +169,19 @@ const handler = async (req: Request): Promise<Response> => {
         continue;
       }
 
+      // Check if WhatsApp bot is active for this user
+      const { data: botActive } = await supabase
+        .rpc("is_whatsapp_bot_active", { p_user_id: reminder.user_id });
+
+      if (!botActive) {
+        console.log(`Bot inactive for user ${reminder.user_id}, skipping reminder`);
+        await supabase
+          .from("reminders")
+          .update({ status: "skipped", sent_at: now.toISOString() })
+          .eq("id", reminder.id);
+        continue;
+      }
+
       // Get business profile for owner notification
       const { data: profile } = await supabase
         .from("profiles")
