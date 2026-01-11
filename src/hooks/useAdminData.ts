@@ -8,11 +8,16 @@ export interface AdminUser {
   business_name: string | null;
   owner_name: string | null;
   email: string | null;
+  whatsapp: string | null;
   created_at: string;
   subscription?: {
     plan: string;
     status: string;
     current_period_end: string | null;
+    whatsapp_bot_enabled: boolean;
+    whatsapp_bot_override: boolean | null;
+    whatsapp_bot_trial_until: string | null;
+    whatsapp_enabled: boolean;
   };
   role?: string;
 }
@@ -53,10 +58,15 @@ export function useAdminData() {
 
         return {
           ...profile,
+          whatsapp: profile.whatsapp,
           subscription: sub ? {
             plan: sub.plan,
             status: sub.status,
             current_period_end: sub.current_period_end,
+            whatsapp_bot_enabled: sub.whatsapp_bot_enabled ?? false,
+            whatsapp_bot_override: sub.whatsapp_bot_override ?? null,
+            whatsapp_bot_trial_until: sub.whatsapp_bot_trial_until ?? null,
+            whatsapp_enabled: sub.whatsapp_enabled ?? false,
           } : undefined,
           role: userRole?.role || 'user',
         };
@@ -77,7 +87,13 @@ export function useAdminData() {
 
   const updateUserSubscription = async (
     userId: string, 
-    updates: { plan?: 'basic' | 'pro' | 'premium'; status?: 'active' | 'trial' | 'inactive' | 'cancelled' }
+    updates: { 
+      plan?: 'basic' | 'pro' | 'premium'; 
+      status?: 'active' | 'trial' | 'inactive' | 'cancelled';
+      whatsapp_bot_enabled?: boolean;
+      whatsapp_bot_override?: boolean | null;
+      whatsapp_bot_trial_until?: string | null;
+    }
   ) => {
     try {
       const { error } = await supabase
@@ -139,9 +155,33 @@ export function useAdminData() {
     }
   };
 
+  // Bot-specific admin functions
+  const toggleBotOverride = async (userId: string, forceValue: boolean | null) => {
+    return updateUserSubscription(userId, { whatsapp_bot_override: forceValue });
+  };
+
+  const grantBotTrial = async (userId: string, days: number = 7) => {
+    const trialEnd = new Date();
+    trialEnd.setDate(trialEnd.getDate() + days);
+    return updateUserSubscription(userId, { whatsapp_bot_trial_until: trialEnd.toISOString() });
+  };
+
+  const revokeBotTrial = async (userId: string) => {
+    return updateUserSubscription(userId, { whatsapp_bot_trial_until: null });
+  };
+
   useEffect(() => {
     fetchAllUsers();
   }, []);
 
-  return { users, loading, updateUserSubscription, updateUserRole, refetch: fetchAllUsers };
+  return { 
+    users, 
+    loading, 
+    updateUserSubscription, 
+    updateUserRole, 
+    toggleBotOverride,
+    grantBotTrial,
+    revokeBotTrial,
+    refetch: fetchAllUsers 
+  };
 }

@@ -386,6 +386,9 @@ export type Database = {
           trial_ends_at: string | null
           updated_at: string
           user_id: string
+          whatsapp_bot_enabled: boolean
+          whatsapp_bot_override: boolean | null
+          whatsapp_bot_trial_until: string | null
           whatsapp_enabled: boolean
         }
         Insert: {
@@ -400,6 +403,9 @@ export type Database = {
           trial_ends_at?: string | null
           updated_at?: string
           user_id: string
+          whatsapp_bot_enabled?: boolean
+          whatsapp_bot_override?: boolean | null
+          whatsapp_bot_trial_until?: string | null
           whatsapp_enabled?: boolean
         }
         Update: {
@@ -414,6 +420,9 @@ export type Database = {
           trial_ends_at?: string | null
           updated_at?: string
           user_id?: string
+          whatsapp_bot_enabled?: boolean
+          whatsapp_bot_override?: boolean | null
+          whatsapp_bot_trial_until?: string | null
           whatsapp_enabled?: boolean
         }
         Relationships: []
@@ -522,6 +531,9 @@ export type Database = {
           trial_ends_at: string | null
           updated_at: string
           user_id: string
+          whatsapp_bot_enabled: boolean
+          whatsapp_bot_override: boolean | null
+          whatsapp_bot_trial_until: string | null
           whatsapp_enabled: boolean
         }
         SetofOptions: {
@@ -540,6 +552,7 @@ export type Database = {
       }
       is_platform_owner_email: { Args: { email: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_whatsapp_bot_active: { Args: { p_user_id: string }; Returns: boolean }
     }
     Enums: {
       app_role: "super_admin" | "admin" | "user"
