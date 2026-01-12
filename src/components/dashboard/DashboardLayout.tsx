@@ -15,7 +15,8 @@ import {
   X,
   Scissors,
   Crown,
-  Shield
+  Shield,
+  Activity
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -164,6 +165,19 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 >
                   <Shield className="w-5 h-5" />
                   Admin
+                </Link>
+                <Link
+                  to="/dashboard/monitoramento"
+                  onClick={() => setSidebarOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                    location.pathname === "/dashboard/monitoramento"
+                      ? "bg-highlight/10 text-highlight"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <Activity className="w-5 h-5" />
+                  Monitoramento
                 </Link>
               </>
             )}

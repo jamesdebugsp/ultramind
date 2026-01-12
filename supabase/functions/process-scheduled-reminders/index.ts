@@ -26,7 +26,7 @@ function formatDate(dateStr: string): string {
   });
 }
 
-async function sendTwilioWhatsApp(to: string, body: string): Promise<{ success: boolean; error?: string }> {
+async function sendTwilioWhatsApp(to: string, body: string): Promise<{ success: boolean; error?: string; sid?: string }> {
   const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
   const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
   const fromNumber = Deno.env.get("TWILIO_WHATSAPP_FROM");
@@ -65,7 +65,7 @@ async function sendTwilioWhatsApp(to: string, body: string): Promise<{ success: 
     }
 
     console.log("WhatsApp sent successfully:", result.sid);
-    return { success: true };
+    return { success: true, sid: result.sid };
   } catch (error: any) {
     console.error("Error sending WhatsApp:", error);
     return { success: false, error: error.message };
@@ -203,6 +203,21 @@ _Lembrete automático UltraMind_`;
         if (appointment.client_whatsapp) {
           const result = await sendTwilioWhatsApp(appointment.client_whatsapp, messageToSend);
           
+          // Log message
+          await supabase.from("whatsapp_message_logs").insert({
+            user_id: reminder.user_id,
+            appointment_id: reminder.appointment_id,
+            reminder_id: reminder.id,
+            recipient_phone: appointment.client_whatsapp,
+            recipient_type: "client",
+            message_type: reminder.reminder_type === "24h" ? "reminder_24h" : "reminder_2h",
+            message_content: messageToSend,
+            status: result.success ? "sent" : "failed",
+            twilio_sid: result.sid,
+            error_message: result.error,
+            sent_at: result.success ? new Date().toISOString() : null,
+          });
+          
           if (result.success) {
             await supabase
               .from("reminders")
@@ -222,17 +237,31 @@ _Lembrete automático UltraMind_`;
 
         // Also notify business owner for 24h reminders
         if (reminder.reminder_type === "24h" && profile?.whatsapp) {
-          await sendTwilioWhatsApp(
-            profile.whatsapp,
-            `📅 *Lembrete de agendamento amanhã*
+          const ownerMessage = `📅 *Lembrete de agendamento amanhã*
 
 👤 Cliente: ${appointment.client_name}
 📱 WhatsApp: ${appointment.client_whatsapp}
 ⏰ Horário: ${appointment.time}
 ✂️ Serviço: ${serviceName}
 
-_Lembrete automático UltraMind_`
-          );
+_Lembrete automático UltraMind_`;
+
+          const ownerResult = await sendTwilioWhatsApp(profile.whatsapp, ownerMessage);
+          
+          // Log owner message
+          await supabase.from("whatsapp_message_logs").insert({
+            user_id: reminder.user_id,
+            appointment_id: reminder.appointment_id,
+            reminder_id: reminder.id,
+            recipient_phone: profile.whatsapp,
+            recipient_type: "owner",
+            message_type: "reminder_24h",
+            message_content: ownerMessage,
+            status: ownerResult.success ? "sent" : "failed",
+            twilio_sid: ownerResult.sid,
+            error_message: ownerResult.error,
+            sent_at: ownerResult.success ? new Date().toISOString() : null,
+          });
         }
       } catch (error) {
         console.error(`Error processing reminder ${reminder.id}:`, error);

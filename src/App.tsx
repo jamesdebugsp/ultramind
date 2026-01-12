@@ -26,6 +26,7 @@ import Configuracoes from "./pages/dashboard/Configuracoes";
 import AdminPanel from "./pages/dashboard/AdminPanel";
 import Planos from "./pages/dashboard/Planos";
 import OwnerDashboard from "./pages/dashboard/OwnerDashboard";
+import MonitoramentoWhatsApp from "./pages/dashboard/MonitoramentoWhatsApp";
 
 const queryClient = new QueryClient();
 
@@ -138,6 +139,14 @@ const App = () => (
                 element={
                   <PrivateRoute>
                     <AdminPanel />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/dashboard/monitoramento"
+                element={
+                  <PrivateRoute>
+                    <MonitoramentoWhatsApp />
                   </PrivateRoute>
                 }
               />

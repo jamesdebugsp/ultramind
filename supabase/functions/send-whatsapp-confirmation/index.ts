@@ -69,7 +69,7 @@ function generateBusinessMessage(clientName: string, clientWhatsapp: string, dat
 _Notificação automática UltraMind_`;
 }
 
-async function sendTwilioWhatsApp(to: string, body: string): Promise<{ success: boolean; error?: string }> {
+async function sendTwilioWhatsApp(to: string, body: string): Promise<{ success: boolean; error?: string; sid?: string }> {
   const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
   const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
   const fromNumber = Deno.env.get("TWILIO_WHATSAPP_FROM");
@@ -108,7 +108,7 @@ async function sendTwilioWhatsApp(to: string, body: string): Promise<{ success: 
     }
 
     console.log("WhatsApp sent successfully:", result.sid);
-    return { success: true };
+    return { success: true, sid: result.sid };
   } catch (error: any) {
     console.error("Error sending WhatsApp:", error);
     return { success: false, error: error.message };
@@ -288,19 +288,47 @@ const handler = async (req: Request): Promise<Response> => {
     const clientMessage = generateClientMessage(clientName, businessName, appointmentDate, appointmentTime, serviceName);
     const businessMessage = generateBusinessMessage(clientName, clientWhatsapp, appointmentDate, appointmentTime, serviceName);
 
-    // Send WhatsApp to client
+    // Send WhatsApp to client and log
     console.log("Sending WhatsApp to client:", clientWhatsapp);
     const clientResult = await sendTwilioWhatsApp(clientWhatsapp, clientMessage);
+    
+    // Log client message
+    await supabase.from("whatsapp_message_logs").insert({
+      user_id: appointment.user_id,
+      appointment_id: payload.appointment_id,
+      recipient_phone: clientWhatsapp,
+      recipient_type: "client",
+      message_type: "confirmation",
+      message_content: clientMessage,
+      status: clientResult.success ? "sent" : "failed",
+      twilio_sid: clientResult.sid,
+      error_message: clientResult.error,
+      sent_at: clientResult.success ? new Date().toISOString() : null,
+    });
     
     if (!clientResult.success) {
       console.error("Failed to send to client:", clientResult.error);
     }
 
     // Send WhatsApp to business owner
-    let businessResult: { success: boolean; error?: string } = { success: false, error: "No business WhatsApp" };
+    let businessResult: { success: boolean; error?: string; sid?: string } = { success: false, error: "No business WhatsApp" };
     if (businessWhatsapp) {
       console.log("Sending WhatsApp to business:", businessWhatsapp);
       businessResult = await sendTwilioWhatsApp(businessWhatsapp, businessMessage);
+      
+      // Log business message
+      await supabase.from("whatsapp_message_logs").insert({
+        user_id: appointment.user_id,
+        appointment_id: payload.appointment_id,
+        recipient_phone: businessWhatsapp,
+        recipient_type: "owner",
+        message_type: "confirmation",
+        message_content: businessMessage,
+        status: businessResult.success ? "sent" : "failed",
+        twilio_sid: businessResult.sid,
+        error_message: businessResult.error,
+        sent_at: businessResult.success ? new Date().toISOString() : null,
+      });
       
       if (!businessResult.success) {
         console.error("Failed to send to business:", businessResult.error);
