@@ -121,10 +121,15 @@ export default function Agendamentos() {
       });
 
       if (error) throw error;
-
-      // Open WhatsApp with the confirmation message
-      if (data?.clientWhatsAppUrl) {
-        window.open(data.clientWhatsAppUrl, '_blank');
+      
+      // Log the result - WhatsApp is sent automatically via Twilio backend
+      console.log('WhatsApp confirmation result:', data);
+      
+      if (data?.clientMessageSent) {
+        toast({
+          title: "WhatsApp enviado! ✓",
+          description: "Mensagem de confirmação enviada automaticamente.",
+        });
       }
     } catch (error) {
       console.error('Error sending WhatsApp confirmation:', error);
@@ -136,9 +141,10 @@ export default function Agendamentos() {
   };
 
   const handleWhatsApp = (phone: string, name: string) => {
+    // Open manual WhatsApp chat (fallback)
     const cleanPhone = phone.replace(/\D/g, "");
-    const message = encodeURIComponent(`Olá ${name}! Tudo bem? Estamos confirmando seu agendamento.`);
-    window.open(`https://api.whatsapp.com/send?phone=55${cleanPhone}&text=${message}`, "_blank");
+    const message = encodeURIComponent(`Olá ${name}! Tudo bem?`);
+    window.open(`https://wa.me/55${cleanPhone}?text=${message}`, "_blank");
   };
 
   const openReminderDialog = (appointment: Appointment) => {
