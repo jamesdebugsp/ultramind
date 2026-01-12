@@ -113,8 +113,7 @@ export default function PublicBooking() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [confirmationData, setConfirmationData] = useState<{
-    clientMessageSent?: boolean;
-    businessMessageSent?: boolean;
+    clientWhatsAppUrl?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -512,14 +511,6 @@ export default function PublicBooking() {
             transition={{ delay: 0.4 }}
             className="space-y-3"
           >
-            {/* Show WhatsApp confirmation message sent status */}
-            {confirmationData?.clientMessageSent && (
-              <div className="flex items-center justify-center gap-2 p-3 bg-emerald-500/10 rounded-lg text-emerald-600 text-sm">
-                <CheckCircle2 className="w-4 h-4" />
-                Confirmação enviada para seu WhatsApp!
-              </div>
-            )}
-
             {businessData.whatsapp && (
               <Button 
                 className="w-full bg-emerald-500 hover:bg-emerald-600 text-white" 
@@ -527,12 +518,21 @@ export default function PublicBooking() {
                 asChild
               >
                 <a
-                  href={`https://wa.me/55${businessData.whatsapp.replace(/\D/g, '')}?text=Olá! Acabei de confirmar meu agendamento.`}
+                  href={`https://api.whatsapp.com/send?phone=55${businessData.whatsapp.replace(/\D/g, '')}&text=Olá! Acabei de confirmar meu agendamento para ${new Date(selectedDate + "T12:00:00").toLocaleDateString("pt-BR", { weekday: 'long', day: '2-digit', month: 'long' })} às ${selectedTime}.`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
                   <MessageCircle className="w-5 h-5 mr-2" />
                   Falar com {businessData.business_name}
+                </a>
+              </Button>
+            )}
+            
+            {confirmationData?.clientWhatsAppUrl && (
+              <Button variant="outline" className="w-full" size="lg" asChild>
+                <a href={confirmationData.clientWhatsAppUrl} target="_blank" rel="noopener noreferrer">
+                  <Phone className="w-4 h-4 mr-2" />
+                  Receber confirmação no WhatsApp
                 </a>
               </Button>
             )}
@@ -582,7 +582,7 @@ export default function PublicBooking() {
               {businessData.whatsapp && (
                 <Button variant="ghost" size="icon" asChild>
                   <a
-                    href={`https://wa.me/55${businessData.whatsapp.replace(/\D/g, '')}`}
+                    href={`https://api.whatsapp.com/send?phone=55${businessData.whatsapp.replace(/\D/g, '')}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="WhatsApp"
