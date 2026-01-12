@@ -44,7 +44,7 @@ function formatDate(dateStr: string): string {
 }
 
 function generateClientMessage(clientName: string, businessName: string, dateStr: string, time: string, serviceName: string): string {
-  return `✅ *Agendamento confirmado com sucesso!*
+  return `✅ *Agendamento confirmado!*
 
 📅 *Data:* ${formatDate(dateStr)}
 ⏰ *Horário:* ${time}
@@ -53,20 +53,21 @@ function generateClientMessage(clientName: string, businessName: string, dateStr
 
 Obrigado por agendar com a gente, ${clientName}!
 
-_Agendamento realizado via UltraMind_`;
+_Agendado via UltraMind_`;
 }
 
 function generateBusinessMessage(clientName: string, clientWhatsapp: string, dateStr: string, time: string, serviceName: string): string {
-  const formattedPhone = clientWhatsapp.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
-  return `📅 *Novo agendamento confirmado!*
+  const cleaned = clientWhatsapp.replace(/\D/g, "");
+  const formattedPhone = cleaned.length === 11 
+    ? cleaned.replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3")
+    : cleaned.replace(/(\d{2})(\d{4})(\d{4})/, "($1) $2-$3");
+  return `📅 *Novo agendamento!*
 
 👤 *Cliente:* ${clientName}
 📱 *WhatsApp:* ${formattedPhone}
 📅 *Data:* ${formatDate(dateStr)}
 ⏰ *Horário:* ${time}
-✂️ *Serviço:* ${serviceName}
-
-_Notificação automática UltraMind_`;
+✂️ *Serviço:* ${serviceName}`;
 }
 
 async function sendTwilioWhatsApp(to: string, body: string): Promise<{ success: boolean; error?: string }> {
@@ -219,17 +220,30 @@ const handler = async (req: Request): Promise<Response> => {
       console.error("Profile not found:", profileError);
     }
 
-    // ========== BOT STATUS CHECK ==========
-    // Check if WhatsApp bot is active for this user before sending messages
-    const { data: botActive, error: botError } = await supabase
-      .rpc("is_whatsapp_bot_active", { p_user_id: appointment.user_id });
+    // ========== WHATSAPP FEATURE CHECK ==========
+    // Check if WhatsApp messaging is enabled for this user's subscription
+    // Note: This checks whatsapp_enabled, NOT whatsapp_bot_enabled (which is for conversational bot)
+    // Confirmation messages should be sent for PRO/PREMIUM plans with whatsapp_enabled = true
+    const { data: subscription, error: subError } = await supabase
+      .from("subscriptions")
+      .select("plan, status, whatsapp_enabled")
+      .eq("user_id", appointment.user_id)
+      .single();
 
-    if (botError) {
-      console.error("Error checking bot status:", botError);
+    if (subError) {
+      console.error("Error fetching subscription:", subError);
     }
 
-    const shouldSendWhatsApp = botActive === true;
-    console.log(`Bot status for user ${appointment.user_id}: ${shouldSendWhatsApp ? 'ACTIVE' : 'INACTIVE'}`);
+    // Send WhatsApp if:
+    // 1. Subscription is active/trial AND
+    // 2. whatsapp_enabled is true (PRO/PREMIUM feature)
+    // Note: We always try to send for confirmations to ensure good UX
+    const isSubscriptionActive = subscription?.status === 'active' || subscription?.status === 'trial';
+    const hasWhatsAppFeature = subscription?.whatsapp_enabled === true;
+    const shouldSendWhatsApp = isSubscriptionActive && hasWhatsAppFeature;
+    
+    console.log(`Subscription for user ${appointment.user_id}: plan=${subscription?.plan}, status=${subscription?.status}, whatsapp_enabled=${subscription?.whatsapp_enabled}`);
+    console.log(`Should send WhatsApp: ${shouldSendWhatsApp}`);
 
     // Use data from database, not from client payload (except as fallback for business info)
     const clientName = appointment.client_name;
@@ -240,7 +254,7 @@ const handler = async (req: Request): Promise<Response> => {
     const appointmentDate = appointment.date;
     const appointmentTime = appointment.time;
 
-    // Update appointment status to confirmed (always do this, regardless of bot status)
+    // Update appointment status to confirmed (always do this)
     const { error: updateError } = await supabase
       .from("appointments")
       .update({ 
@@ -253,14 +267,14 @@ const handler = async (req: Request): Promise<Response> => {
       console.error("Error updating appointment:", updateError);
     }
 
-    // If bot is not active, return early without sending WhatsApp
+    // If WhatsApp feature is not enabled, return early
     if (!shouldSendWhatsApp) {
-      console.log("WhatsApp bot is not active for this user. Skipping messages.");
+      console.log("WhatsApp not enabled for this subscription. Skipping messages.");
       return new Response(
         JSON.stringify({
           success: true,
-          botActive: false,
-          message: "Appointment confirmed. WhatsApp messages not sent (bot inactive).",
+          whatsappEnabled: false,
+          message: "Agendamento confirmado. Mensagens WhatsApp não enviadas (recurso não habilitado no plano).",
           clientMessageSent: false,
           businessMessageSent: false,
         }),
@@ -307,39 +321,67 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    // Create automatic 24h reminder
+    // Create automatic reminders (24h and 2h before)
     const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
-    const reminderTime = new Date(appointmentDateTime.getTime() - 24 * 60 * 60 * 1000); // 24h before
+    const now = new Date();
     
-    // Only create reminder if it's in the future
-    if (reminderTime > new Date()) {
-      const reminderMessage = `⏰ *Lembrete de agendamento*
+    // 24h reminder
+    const reminder24h = new Date(appointmentDateTime.getTime() - 24 * 60 * 60 * 1000);
+    if (reminder24h > now) {
+      const message24h = `⏰ *Lembrete de agendamento*
 
 Seu horário é *amanhã* às *${appointmentTime}* para *${serviceName}*.
 
 📍 ${businessName}
 
-Confirme sua presença respondendo:
-✅ SIM - para confirmar
-❌ NÃO - para cancelar
-
 _Lembrete automático UltraMind_`;
 
-      const { error: reminderError } = await supabase
+      const { error: err24h } = await supabase
         .from("reminders")
         .insert({
           appointment_id: payload.appointment_id,
           user_id: appointment.user_id,
-          scheduled_for: reminderTime.toISOString(),
+          scheduled_for: reminder24h.toISOString(),
           status: "pending",
           reminder_type: "whatsapp",
-          message: reminderMessage,
+          message: message24h,
         });
 
-      if (reminderError) {
-        console.error("Error creating reminder:", reminderError);
+      if (err24h) {
+        console.error("Error creating 24h reminder:", err24h);
       } else {
-        console.log("24h reminder scheduled for:", reminderTime.toISOString());
+        console.log("24h reminder scheduled for:", reminder24h.toISOString());
+      }
+    }
+
+    // 2h reminder
+    const reminder2h = new Date(appointmentDateTime.getTime() - 2 * 60 * 60 * 1000);
+    if (reminder2h > now) {
+      const message2h = `⏰ *Lembrete: Seu horário é em 2 horas!*
+
+📅 Hoje às *${appointmentTime}*
+✂️ *${serviceName}*
+📍 ${businessName}
+
+Te esperamos! 😊
+
+_Lembrete automático UltraMind_`;
+
+      const { error: err2h } = await supabase
+        .from("reminders")
+        .insert({
+          appointment_id: payload.appointment_id,
+          user_id: appointment.user_id,
+          scheduled_for: reminder2h.toISOString(),
+          status: "pending",
+          reminder_type: "whatsapp",
+          message: message2h,
+        });
+
+      if (err2h) {
+        console.error("Error creating 2h reminder:", err2h);
+      } else {
+        console.log("2h reminder scheduled for:", reminder2h.toISOString());
       }
     }
 
@@ -348,11 +390,15 @@ _Lembrete automático UltraMind_`;
     return new Response(
       JSON.stringify({
         success: true,
-        botActive: true,
+        whatsappEnabled: true,
         clientMessageSent: clientResult.success,
         businessMessageSent: businessResult.success,
         clientError: clientResult.error,
         businessError: businessResult.error,
+        reminders: {
+          reminder24h: reminder24h > now,
+          reminder2h: reminder2h > now,
+        }
       }),
       {
         status: 200,
