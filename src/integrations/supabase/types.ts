@@ -504,6 +504,69 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_message_logs: {
+        Row: {
+          appointment_id: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          message_content: string | null
+          message_type: string
+          recipient_phone: string
+          recipient_type: string
+          reminder_id: string | null
+          sent_at: string | null
+          status: string
+          twilio_sid: string | null
+          user_id: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message_content?: string | null
+          message_type?: string
+          recipient_phone: string
+          recipient_type?: string
+          reminder_id?: string | null
+          sent_at?: string | null
+          status?: string
+          twilio_sid?: string | null
+          user_id: string
+        }
+        Update: {
+          appointment_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message_content?: string | null
+          message_type?: string
+          recipient_phone?: string
+          recipient_type?: string
+          reminder_id?: string | null
+          sent_at?: string | null
+          status?: string
+          twilio_sid?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_message_logs_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_message_logs_reminder_id_fkey"
+            columns: ["reminder_id"]
+            isOneToOne: false
+            referencedRelation: "reminders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       appointment_availability: {
