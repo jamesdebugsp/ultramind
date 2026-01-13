@@ -432,10 +432,14 @@ export type Database = {
       subscriptions: {
         Row: {
           created_at: string
+          credits_reset_at: string | null
+          credits_used: number
           current_period_end: string | null
           current_period_start: string | null
+          extra_credits: number
           id: string
           max_appointments: number
+          monthly_credits: number
           plan: Database["public"]["Enums"]["subscription_plan"]
           reminders_enabled: boolean
           status: Database["public"]["Enums"]["subscription_status"]
@@ -449,10 +453,14 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          credits_reset_at?: string | null
+          credits_used?: number
           current_period_end?: string | null
           current_period_start?: string | null
+          extra_credits?: number
           id?: string
           max_appointments?: number
+          monthly_credits?: number
           plan?: Database["public"]["Enums"]["subscription_plan"]
           reminders_enabled?: boolean
           status?: Database["public"]["Enums"]["subscription_status"]
@@ -466,10 +474,14 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          credits_reset_at?: string | null
+          credits_used?: number
           current_period_end?: string | null
           current_period_start?: string | null
+          extra_credits?: number
           id?: string
           max_appointments?: number
+          monthly_credits?: number
           plan?: Database["public"]["Enums"]["subscription_plan"]
           reminders_enabled?: boolean
           status?: Database["public"]["Enums"]["subscription_status"]
@@ -625,7 +637,19 @@ export type Database = {
       }
     }
     Functions: {
+      add_extra_credits: {
+        Args: { p_amount: number; p_user_id: string }
+        Returns: boolean
+      }
+      can_send_whatsapp_message: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
       clean_expired_conversations: { Args: never; Returns: number }
+      consume_credit: {
+        Args: { p_amount?: number; p_user_id: string }
+        Returns: boolean
+      }
       create_public_appointment: {
         Args: {
           p_client_name: string
@@ -637,14 +661,19 @@ export type Database = {
         }
         Returns: string
       }
+      get_available_credits: { Args: { p_user_id: string }; Returns: number }
       get_user_subscription: {
         Args: { _user_id: string }
         Returns: {
           created_at: string
+          credits_reset_at: string | null
+          credits_used: number
           current_period_end: string | null
           current_period_start: string | null
+          extra_credits: number
           id: string
           max_appointments: number
+          monthly_credits: number
           plan: Database["public"]["Enums"]["subscription_plan"]
           reminders_enabled: boolean
           status: Database["public"]["Enums"]["subscription_status"]
@@ -673,6 +702,7 @@ export type Database = {
       is_platform_owner_email: { Args: { email: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_whatsapp_bot_active: { Args: { p_user_id: string }; Returns: boolean }
+      reset_monthly_credits: { Args: { p_user_id: string }; Returns: undefined }
     }
     Enums: {
       app_role: "super_admin" | "admin" | "user"

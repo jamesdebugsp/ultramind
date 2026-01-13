@@ -21,9 +21,7 @@ interface AppointmentConfirmation {
 }
 
 function formatPhone(phone: string): string {
-  // Remove all non-numeric characters
   const cleaned = phone.replace(/\D/g, "");
-  // Add Brazil country code if not present
   if (cleaned.length === 10 || cleaned.length === 11) {
     return `+55${cleaned}`;
   }
@@ -116,7 +114,6 @@ async function sendTwilioWhatsApp(to: string, body: string): Promise<{ success: 
 }
 
 const handler = async (req: Request): Promise<Response> => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -130,7 +127,6 @@ const handler = async (req: Request): Promise<Response> => {
     
     console.log("Processing appointment confirmation request");
 
-    // Validate appointment_id is required
     if (!payload.appointment_id) {
       return new Response(
         JSON.stringify({ error: "appointment_id is required" }),
@@ -154,7 +150,7 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    // Fetch appointment data from database to verify it exists and get accurate data
+    // Fetch appointment data
     const { data: appointment, error: appointmentError } = await supabase
       .from("appointments")
       .select(`
@@ -182,7 +178,6 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Authorization check
     if (isAuthenticated) {
-      // Authenticated users must own the appointment
       if (appointment.user_id !== authenticatedUserId) {
         console.error("User does not own this appointment");
         return new Response(
@@ -190,48 +185,43 @@ const handler = async (req: Request): Promise<Response> => {
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      console.log("Authorization passed: authenticated user owns appointment");
     } else {
-      // For unauthenticated requests, verify appointment was created recently
-      // This prevents abuse by only allowing confirmation for recently created appointments
       const createdAt = new Date(appointment.created_at);
       const now = new Date();
       const minutesSinceCreation = (now.getTime() - createdAt.getTime()) / (1000 * 60);
 
       if (minutesSinceCreation > PUBLIC_CONFIRMATION_WINDOW_MINUTES) {
-        console.error(`Appointment too old for public confirmation: ${minutesSinceCreation.toFixed(1)} minutes`);
         return new Response(
           JSON.stringify({ error: "Confirmation window expired. Please contact the business directly." }),
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      console.log(`Authorization passed: appointment created ${minutesSinceCreation.toFixed(1)} minutes ago`);
     }
 
-    // Fetch business profile for the appointment owner
-    const { data: profile, error: profileError } = await supabase
+    // Fetch business profile
+    const { data: profile } = await supabase
       .from("profiles")
       .select("business_name, whatsapp")
       .eq("user_id", appointment.user_id)
       .single();
 
-    if (profileError) {
-      console.error("Profile not found:", profileError);
+    // ========== CREDIT CHECK ==========
+    // Check if user can send WhatsApp (bot active + credits available)
+    const { data: canSend, error: canSendError } = await supabase
+      .rpc("can_send_whatsapp_message", { p_user_id: appointment.user_id });
+
+    if (canSendError) {
+      console.error("Error checking send permission:", canSendError);
     }
 
-    // ========== BOT STATUS CHECK ==========
-    // Check if WhatsApp bot is active for this user before sending messages
-    const { data: botActive, error: botError } = await supabase
-      .rpc("is_whatsapp_bot_active", { p_user_id: appointment.user_id });
+    const shouldSendWhatsApp = canSend === true;
+    console.log(`Can send WhatsApp for user ${appointment.user_id}: ${shouldSendWhatsApp}`);
 
-    if (botError) {
-      console.error("Error checking bot status:", botError);
-    }
+    // Get current credits for logging
+    const { data: availableCredits } = await supabase
+      .rpc("get_available_credits", { p_user_id: appointment.user_id });
+    console.log(`Available credits: ${availableCredits}`);
 
-    const shouldSendWhatsApp = botActive === true;
-    console.log(`Bot status for user ${appointment.user_id}: ${shouldSendWhatsApp ? 'ACTIVE' : 'INACTIVE'}`);
-
-    // Use data from database, not from client payload (except as fallback for business info)
     const clientName = appointment.client_name;
     const clientWhatsapp = appointment.client_whatsapp;
     const businessName = profile?.business_name || payload.business_name || "Estabelecimento";
@@ -240,8 +230,8 @@ const handler = async (req: Request): Promise<Response> => {
     const appointmentDate = appointment.date;
     const appointmentTime = appointment.time;
 
-    // Update appointment status to confirmed (always do this, regardless of bot status)
-    const { error: updateError } = await supabase
+    // Update appointment status
+    await supabase
       .from("appointments")
       .update({ 
         status: "confirmado",
@@ -249,30 +239,24 @@ const handler = async (req: Request): Promise<Response> => {
       })
       .eq("id", payload.appointment_id);
 
-    if (updateError) {
-      console.error("Error updating appointment:", updateError);
-    }
-
-    // If bot is not active, return early without sending WhatsApp
+    // If no credits or bot not active, return early
     if (!shouldSendWhatsApp) {
-      console.log("WhatsApp bot is not active for this user. Skipping messages.");
+      const reason = availableCredits === 0 ? "Sem créditos disponíveis" : "Bot WhatsApp inativo";
+      console.log(`WhatsApp not sent: ${reason}`);
       return new Response(
         JSON.stringify({
           success: true,
           botActive: false,
-          message: "Appointment confirmed. WhatsApp messages not sent (bot inactive).",
+          message: `Agendamento confirmado. Mensagens WhatsApp não enviadas (${reason}).`,
           clientMessageSent: false,
           businessMessageSent: false,
+          availableCredits: availableCredits || 0,
         }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     if (!clientWhatsapp) {
-      console.error("No client WhatsApp available");
       return new Response(
         JSON.stringify({ 
           success: true,
@@ -284,13 +268,39 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Generate messages using verified database data
+    // Generate messages
     const clientMessage = generateClientMessage(clientName, businessName, appointmentDate, appointmentTime, serviceName);
     const businessMessage = generateBusinessMessage(clientName, clientWhatsapp, appointmentDate, appointmentTime, serviceName);
 
-    // Send WhatsApp to client and log
+    // Count how many messages we'll send (for credit consumption)
+    let messagesToSend = 1; // At least client message
+    if (businessWhatsapp) messagesToSend++;
+
+    // Check if we have enough credits for all messages
+    if (availableCredits < messagesToSend) {
+      console.log(`Not enough credits: need ${messagesToSend}, have ${availableCredits}`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          botActive: true,
+          message: `Créditos insuficientes. Necessário: ${messagesToSend}, Disponível: ${availableCredits}`,
+          clientMessageSent: false,
+          businessMessageSent: false,
+          availableCredits,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Send WhatsApp to client and consume credit
     console.log("Sending WhatsApp to client:", clientWhatsapp);
     const clientResult = await sendTwilioWhatsApp(clientWhatsapp, clientMessage);
+    
+    if (clientResult.success) {
+      // Consume 1 credit for client message
+      await supabase.rpc("consume_credit", { p_user_id: appointment.user_id, p_amount: 1 });
+      console.log("Credit consumed for client message");
+    }
     
     // Log client message
     await supabase.from("whatsapp_message_logs").insert({
@@ -305,16 +315,18 @@ const handler = async (req: Request): Promise<Response> => {
       error_message: clientResult.error,
       sent_at: clientResult.success ? new Date().toISOString() : null,
     });
-    
-    if (!clientResult.success) {
-      console.error("Failed to send to client:", clientResult.error);
-    }
 
     // Send WhatsApp to business owner
     let businessResult: { success: boolean; error?: string; sid?: string } = { success: false, error: "No business WhatsApp" };
     if (businessWhatsapp) {
       console.log("Sending WhatsApp to business:", businessWhatsapp);
       businessResult = await sendTwilioWhatsApp(businessWhatsapp, businessMessage);
+      
+      if (businessResult.success) {
+        // Consume 1 credit for business message
+        await supabase.rpc("consume_credit", { p_user_id: appointment.user_id, p_amount: 1 });
+        console.log("Credit consumed for business message");
+      }
       
       // Log business message
       await supabase.from("whatsapp_message_logs").insert({
@@ -329,17 +341,12 @@ const handler = async (req: Request): Promise<Response> => {
         error_message: businessResult.error,
         sent_at: businessResult.success ? new Date().toISOString() : null,
       });
-      
-      if (!businessResult.success) {
-        console.error("Failed to send to business:", businessResult.error);
-      }
     }
 
     // Create automatic 24h reminder
     const appointmentDateTime = new Date(`${appointmentDate}T${appointmentTime}`);
-    const reminderTime = new Date(appointmentDateTime.getTime() - 24 * 60 * 60 * 1000); // 24h before
+    const reminderTime = new Date(appointmentDateTime.getTime() - 24 * 60 * 60 * 1000);
     
-    // Only create reminder if it's in the future
     if (reminderTime > new Date()) {
       const reminderMessage = `⏰ *Lembrete de agendamento*
 
@@ -353,25 +360,19 @@ Confirme sua presença respondendo:
 
 _Lembrete automático UltraMind_`;
 
-      const { error: reminderError } = await supabase
-        .from("reminders")
-        .insert({
-          appointment_id: payload.appointment_id,
-          user_id: appointment.user_id,
-          scheduled_for: reminderTime.toISOString(),
-          status: "pending",
-          reminder_type: "whatsapp",
-          message: reminderMessage,
-        });
-
-      if (reminderError) {
-        console.error("Error creating reminder:", reminderError);
-      } else {
-        console.log("24h reminder scheduled for:", reminderTime.toISOString());
-      }
+      await supabase.from("reminders").insert({
+        appointment_id: payload.appointment_id,
+        user_id: appointment.user_id,
+        scheduled_for: reminderTime.toISOString(),
+        status: "pending",
+        reminder_type: "whatsapp",
+        message: reminderMessage,
+      });
     }
 
-    console.log("Confirmation processed successfully");
+    // Get updated credits
+    const { data: updatedCredits } = await supabase
+      .rpc("get_available_credits", { p_user_id: appointment.user_id });
 
     return new Response(
       JSON.stringify({
@@ -381,20 +382,16 @@ _Lembrete automático UltraMind_`;
         businessMessageSent: businessResult.success,
         clientError: clientResult.error,
         businessError: businessResult.error,
+        creditsUsed: (clientResult.success ? 1 : 0) + (businessResult.success ? 1 : 0),
+        availableCredits: updatedCredits || 0,
       }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
     console.error("Error in send-whatsapp-confirmation:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 };

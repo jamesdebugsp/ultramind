@@ -6,7 +6,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-twilio-signature",
 };
 
-// Conversation steps
 type ConversationStep = 
   | "menu" 
   | "awaiting_service" 
@@ -34,7 +33,6 @@ interface TwilioMessage {
   AccountSid?: string;
 }
 
-// Create HMAC-SHA1 signature using Web Crypto API
 async function createHmacSha1(key: string, data: string): Promise<string> {
   const encoder = new TextEncoder();
   const keyData = encoder.encode(key);
@@ -52,7 +50,6 @@ async function createHmacSha1(key: string, data: string): Promise<string> {
   return btoa(String.fromCharCode(...new Uint8Array(signature)));
 }
 
-// Validate Twilio webhook signature
 async function validateTwilioSignature(
   signature: string | null,
   url: string,
@@ -97,7 +94,6 @@ function formatDate(dateStr: string): string {
 }
 
 function parseDate(input: string): string | null {
-  // Parse formats: dd/mm, dd/mm/yyyy, "amanha", "hoje"
   const today = new Date();
   const normalized = input.toLowerCase().trim();
 
@@ -111,7 +107,6 @@ function parseDate(input: string): string | null {
     return tomorrow.toISOString().split("T")[0];
   }
 
-  // Try dd/mm or dd/mm/yyyy
   const dateMatch = normalized.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
   if (dateMatch) {
     const day = parseInt(dateMatch[1], 10);
@@ -130,7 +125,6 @@ function parseDate(input: string): string | null {
 }
 
 function parseTime(input: string): string | null {
-  // Parse formats: HH:MM, HH, HHh, HHhMM
   const normalized = input.toLowerCase().trim().replace("h", ":");
   
   const timeMatch = normalized.match(/^(\d{1,2}):?(\d{2})?$/);
@@ -146,14 +140,33 @@ function parseTime(input: string): string | null {
   return null;
 }
 
-async function sendWhatsAppMessage(to: string, body: string): Promise<boolean> {
+async function sendWhatsAppMessage(
+  supabase: any,
+  userId: string,
+  to: string, 
+  body: string,
+  appointmentId?: string,
+  messageType: string = "bot_response"
+): Promise<{ success: boolean; sid?: string; error?: string }> {
   const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
   const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
   const fromNumber = Deno.env.get("TWILIO_WHATSAPP_FROM");
 
   if (!accountSid || !authToken || !fromNumber) {
     console.error("Missing Twilio credentials");
-    return false;
+    return { success: false, error: "Missing Twilio credentials" };
+  }
+
+  // Check credits before sending
+  const { data: canSend } = await supabase
+    .rpc("can_send_whatsapp_message", { p_user_id: userId });
+
+  if (!canSend) {
+    const { data: credits } = await supabase
+      .rpc("get_available_credits", { p_user_id: userId });
+    const reason = credits === 0 ? "sem créditos" : "bot inativo";
+    console.log(`Cannot send message: ${reason}`);
+    return { success: false, error: `Não enviado: ${reason}` };
   }
 
   const formattedTo = to.startsWith("whatsapp:") ? to : `whatsapp:${formatPhone(to)}`;
@@ -176,10 +189,44 @@ async function sendWhatsAppMessage(to: string, body: string): Promise<boolean> {
       body: params.toString(),
     });
 
-    return response.ok;
-  } catch (error) {
+    const result = await response.json();
+
+    if (response.ok) {
+      // Consume 1 credit for the message
+      await supabase.rpc("consume_credit", { p_user_id: userId, p_amount: 1 });
+      console.log(`Credit consumed for bot message to ${to}`);
+
+      // Log success
+      await supabase.from("whatsapp_message_logs").insert({
+        user_id: userId,
+        appointment_id: appointmentId,
+        recipient_phone: to.replace("whatsapp:", ""),
+        recipient_type: "client",
+        message_type: messageType,
+        message_content: body,
+        status: "sent",
+        twilio_sid: result.sid,
+        sent_at: new Date().toISOString(),
+      });
+
+      return { success: true, sid: result.sid };
+    } else {
+      // Log failure
+      await supabase.from("whatsapp_message_logs").insert({
+        user_id: userId,
+        recipient_phone: to.replace("whatsapp:", ""),
+        recipient_type: "client",
+        message_type: messageType,
+        message_content: body,
+        status: "failed",
+        error_message: result.message,
+      });
+
+      return { success: false, error: result.message };
+    }
+  } catch (error: any) {
     console.error("Error sending WhatsApp:", error);
-    return false;
+    return { success: false, error: error.message };
   }
 }
 
@@ -188,8 +235,7 @@ async function getOrCreateConversation(
   phoneNumber: string,
   businessUserId: string
 ): Promise<ConversationState | null> {
-  // First, try to get existing conversation
-  const { data: existing, error: getError } = await supabase
+  const { data: existing } = await supabase
     .from("bot_conversations")
     .select("*")
     .eq("phone_number", phoneNumber)
@@ -198,7 +244,6 @@ async function getOrCreateConversation(
     .single();
 
   if (existing) {
-    // Update last message timestamp and extend expiry
     await supabase
       .from("bot_conversations")
       .update({
@@ -211,7 +256,6 @@ async function getOrCreateConversation(
     return existing;
   }
 
-  // Create new conversation
   const { data: newConv, error: createError } = await supabase
     .from("bot_conversations")
     .upsert({
@@ -271,12 +315,14 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Check if bot is active for this business
-    const { data: botActive } = await supabase.rpc("is_whatsapp_bot_active", { p_user_id: businessUserId });
-    if (!botActive) {
-      console.log(`Bot not active for business ${businessUserId}`);
+    // Check if bot is active AND has credits
+    const { data: canSend } = await supabase.rpc("can_send_whatsapp_message", { p_user_id: businessUserId });
+    if (!canSend) {
+      const { data: credits } = await supabase.rpc("get_available_credits", { p_user_id: businessUserId });
+      const reason = credits === 0 ? "sem créditos" : "bot inativo";
+      console.log(`Bot not available for business ${businessUserId}: ${reason}`);
       return new Response(
-        JSON.stringify({ error: "Bot not active" }),
+        JSON.stringify({ error: `Bot not available: ${reason}` }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -296,7 +342,6 @@ const handler = async (req: Request): Promise<Response> => {
       params[key] = value.toString();
     });
 
-    // Validate Twilio signature
     const twilioSignature = req.headers.get("X-Twilio-Signature");
     const isValid = await validateTwilioSignature(
       twilioSignature,
@@ -375,7 +420,6 @@ ${bookingLink ? `Ou acesse nosso site: ${bookingLink}` : ""}
 _Digite o número da opção desejada_`;
 
         if (messageText === "1") {
-          // Go to service selection
           const { data: services } = await supabase
             .from("services")
             .select("id, name, price, duration")
@@ -403,7 +447,6 @@ Digite *0* para voltar ao menu.`;
             });
           }
         } else if (messageText === "2") {
-          // Show services and prices
           const { data: services } = await supabase
             .from("services")
             .select("name, price, duration, description")
@@ -428,7 +471,6 @@ Digite *0* para voltar ao menu.`;
             responseMessage = priceList;
           }
         } else if (messageText === "3") {
-          // Transfer to human
           const businessWhatsapp = profile?.whatsapp;
           if (businessWhatsapp) {
             responseMessage = `👤 Você será atendido por um humano em breve!
@@ -446,8 +488,12 @@ _Digite *0* para voltar ao menu_`;
           // Notify business owner
           if (profile?.whatsapp) {
             await sendWhatsAppMessage(
+              supabase,
+              businessUserId,
               profile.whatsapp,
-              `🔔 *Solicitação de Atendimento*\n\nCliente solicitou atendimento humano:\n📱 ${customerPhone}\n\n_Notificação automática UltraMind_`
+              `🔔 *Solicitação de Atendimento*\n\nCliente solicitou atendimento humano:\n📱 ${customerPhone}\n\n_Notificação automática UltraMind_`,
+              undefined,
+              "human_request"
             );
           }
         }
@@ -491,7 +537,6 @@ _Digite *0* para voltar ao menu_`;
         const parsedDate = parseDate(message.Body);
 
         if (parsedDate) {
-          // Check if date is a working day
           const { data: settings } = await supabase
             .from("settings")
             .select("working_days, working_hours_start, working_hours_end, appointment_interval")
@@ -519,12 +564,10 @@ Dias disponíveis: ${workingDays.map((d: string) => {
 
 _Digite outra data ou *0* para voltar_`;
           } else {
-            // Get available times for this date
             const startHour = settings?.working_hours_start || "09:00";
             const endHour = settings?.working_hours_end || "18:00";
             const interval = settings?.appointment_interval || 30;
 
-            // Get existing appointments for this date
             const { data: existingAppointments } = await supabase
               .from("appointments")
               .select("time")
@@ -534,7 +577,6 @@ _Digite outra data ou *0* para voltar_`;
 
             const bookedTimes = new Set((existingAppointments || []).map((a: any) => a.time.slice(0, 5)));
 
-            // Generate available slots
             const availableSlots: string[] = [];
             const [startH, startM] = startHour.split(":").map(Number);
             const [endH, endM] = endHour.split(":").map(Number);
@@ -659,7 +701,6 @@ _Digite *0* para voltar ao menu_`;
 
       case "awaiting_confirmation": {
         if (messageText === "1" || messageText === "sim" || messageText === "s") {
-          // Create the appointment
           const selectedService = conversation.conversation_data?.selectedService;
           
           const { data: appointment, error: appointmentError } = await supabase
@@ -686,7 +727,6 @@ _Digite *0* para voltar ao menu_`;
             // Create reminders (24h and 2h before)
             const appointmentDateTime = new Date(`${conversation.selected_date}T${conversation.selected_time}`);
             
-            // 24h reminder
             const reminder24h = new Date(appointmentDateTime.getTime() - 24 * 60 * 60 * 1000);
             if (reminder24h > new Date()) {
               await supabase.from("reminders").insert({
@@ -699,7 +739,6 @@ _Digite *0* para voltar ao menu_`;
               });
             }
 
-            // 2h reminder
             const reminder2h = new Date(appointmentDateTime.getTime() - 2 * 60 * 60 * 1000);
             if (reminder2h > new Date()) {
               await supabase.from("reminders").insert({
@@ -715,6 +754,8 @@ _Digite *0* para voltar ao menu_`;
             // Notify business owner
             if (profile?.whatsapp) {
               await sendWhatsAppMessage(
+                supabase,
+                businessUserId,
                 profile.whatsapp,
                 `📅 *Novo agendamento confirmado!*
 
@@ -725,7 +766,9 @@ _Digite *0* para voltar ao menu_`;
 ✂️ *Serviço:* ${selectedService?.name}
 💰 *Valor:* R$ ${selectedService?.price?.toFixed(2)}
 
-_Agendamento via Bot WhatsApp UltraMind_`
+_Agendamento via Bot WhatsApp UltraMind_`,
+                appointment.id,
+                "confirmation"
               );
             }
 
@@ -742,7 +785,6 @@ Obrigado por agendar com a gente! 🎉
 
 _Digite *0* para voltar ao menu principal_`;
 
-            // Clear conversation after successful booking
             await deleteConversation(supabase, conversation.id);
           }
         } else if (messageText === "2" || messageText === "nao" || messageText === "não" || messageText === "n") {
@@ -771,10 +813,9 @@ _Digite *0* para voltar ao menu_`;
       }
     }
 
-    // Send response
-    await sendWhatsAppMessage(message.From, responseMessage);
+    // Send response (consumes credit)
+    await sendWhatsAppMessage(supabase, businessUserId, message.From, responseMessage, undefined, "bot_response");
 
-    // Return TwiML response for Twilio
     const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`;
     
     return new Response(twiml, {
