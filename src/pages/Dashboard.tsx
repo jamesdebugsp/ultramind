@@ -5,33 +5,41 @@ import {
   TrendingUp, 
   Clock, 
   Scissors,
-  ArrowUpRight,
-  ArrowDownRight,
   ExternalLink,
   Copy,
   CheckCircle2,
-  Loader2
+  Loader2,
+  MessageSquare,
+  AlertTriangle,
+  Sparkles,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useProfile } from "@/hooks/useProfile";
 import { useServices } from "@/hooks/useServices";
 import { useClients } from "@/hooks/useClients";
 import { useAppointments } from "@/hooks/useAppointments";
+import { useCredits } from "@/hooks/useCredits";
+import { useSubscription } from "@/hooks/useSubscription";
 
 export default function Dashboard() {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { profile, loading: profileLoading } = useProfile();
   const { services, loading: servicesLoading } = useServices();
   const { clients, loading: clientsLoading } = useClients();
   const { appointments, loading: appointmentsLoading } = useAppointments();
+  const { creditInfo, loading: creditsLoading, getUsagePercentage, isLowCredits, hasNoCredits } = useCredits();
+  const { subscription, loading: subscriptionLoading } = useSubscription();
 
-  const loading = profileLoading || servicesLoading || clientsLoading || appointmentsLoading;
+  const loading = profileLoading || servicesLoading || clientsLoading || appointmentsLoading || creditsLoading || subscriptionLoading;
 
   const businessSlug = useMemo(() => {
     // prioriza slug personalizado do perfil
@@ -57,21 +65,18 @@ export default function Dashboard() {
       title: "Agendamentos Hoje",
       value: todayAppointments.length.toString(),
       change: `${confirmedToday} confirmados`,
-      trend: "up" as const,
       icon: Calendar,
     },
     {
       title: "Clientes",
       value: clients.length.toString(),
-      change: "+0%",
-      trend: "up" as const,
+      change: "cadastrados",
       icon: Users,
     },
     {
       title: "Serviços Ativos",
       value: services.filter(s => s.status === 'active').length.toString(),
       change: `${services.length} total`,
-      trend: "up" as const,
       icon: Scissors,
     },
     {
@@ -80,7 +85,6 @@ export default function Dashboard() {
         ? `${Math.round((appointments.filter(a => a.status === 'concluido').length / appointments.length) * 100)}%`
         : "0%",
       change: "últimos 30 dias",
-      trend: "up" as const,
       icon: TrendingUp,
     },
   ];
@@ -114,6 +118,15 @@ export default function Dashboard() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Determine WhatsApp status
+  const whatsappEnabled = subscription?.whatsapp_enabled;
+  const whatsappStatus = useMemo(() => {
+    if (!whatsappEnabled) return { status: "disabled", label: "Inativo", color: "text-muted-foreground" };
+    if (hasNoCredits()) return { status: "blocked", label: "Bloqueado (sem créditos)", color: "text-destructive" };
+    if (isLowCredits()) return { status: "warning", label: "Poucos créditos", color: "text-amber-600" };
+    return { status: "active", label: "Ativo", color: "text-emerald-600" };
+  }, [whatsappEnabled, hasNoCredits, isLowCredits]);
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -140,6 +153,72 @@ export default function Dashboard() {
             Aqui está o resumo do seu dia
           </p>
         </motion.div>
+
+        {/* WhatsApp Credits Card - Show only for Pro/Premium */}
+        {whatsappEnabled && creditInfo && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="mb-6"
+          >
+            <Card 
+              variant={hasNoCredits() ? "elevated" : "highlight"} 
+              className={`p-4 lg:p-6 ${hasNoCredits() ? 'border-destructive/50 bg-destructive/5' : isLowCredits() ? 'border-amber-500/50 bg-amber-500/5' : ''}`}
+            >
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                    hasNoCredits() ? 'bg-destructive/10' : isLowCredits() ? 'bg-amber-500/10' : 'bg-highlight/10'
+                  }`}>
+                    {hasNoCredits() ? (
+                      <AlertTriangle className="w-6 h-6 text-destructive" />
+                    ) : (
+                      <MessageSquare className={`w-6 h-6 ${isLowCredits() ? 'text-amber-600' : 'text-highlight'}`} />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-foreground">WhatsApp Bot</h3>
+                      <Badge className={`${
+                        whatsappStatus.status === 'active' ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' :
+                        whatsappStatus.status === 'warning' ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' :
+                        whatsappStatus.status === 'blocked' ? 'bg-destructive/10 text-destructive border-destructive/20' :
+                        'bg-muted text-muted-foreground'
+                      }`}>
+                        {whatsappStatus.label}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="text-muted-foreground">
+                        <Sparkles className="w-4 h-4 inline mr-1" />
+                        {creditInfo.availableCredits} créditos disponíveis
+                      </span>
+                      <span className="text-muted-foreground">
+                        {creditInfo.creditsUsed} usados este mês
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 lg:w-32">
+                    <Progress 
+                      value={getUsagePercentage()} 
+                      className={`h-2 ${hasNoCredits() ? '[&>div]:bg-destructive' : isLowCredits() ? '[&>div]:bg-amber-500' : ''}`}
+                    />
+                  </div>
+                  <Button 
+                    variant={hasNoCredits() ? "destructive" : "outline"} 
+                    size="sm"
+                    onClick={() => navigate('/dashboard/planos')}
+                  >
+                    {hasNoCredits() ? 'Comprar Créditos' : 'Ver Planos'}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
+        )}
 
         {/* Booking Link Card */}
         <motion.div
@@ -177,7 +256,7 @@ export default function Dashboard() {
               key={stat.title}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 + index * 0.05 }}
+              transition={{ delay: 0.15 + index * 0.05 }}
             >
               <Card variant="elevated" className="p-4 lg:p-6">
                 <div className="flex items-start justify-between mb-3">
