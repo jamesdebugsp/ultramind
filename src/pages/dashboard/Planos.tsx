@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useState } from "react";
 import {
   Check,
   Crown,
@@ -9,12 +10,25 @@ import {
   Bell,
   Calendar,
   Users,
+  Gift,
+  CreditCard,
+  Sparkles,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useSubscription, SubscriptionPlan } from "@/hooks/useSubscription";
+import { useCredits, CREDIT_PACKAGES, PLAN_CREDITS } from "@/hooks/useCredits";
 
 const plans = [
   {
@@ -25,6 +39,7 @@ const plans = [
     icon: Star,
     color: "text-blue-500",
     bgColor: "bg-blue-500/10",
+    credits: 0,
     features: [
       { text: "Até 50 agendamentos/mês", included: true },
       { text: "Página de agendamento", included: true },
@@ -44,6 +59,7 @@ const plans = [
     color: "text-highlight",
     bgColor: "bg-highlight/10",
     popular: true,
+    credits: 600,
     features: [
       { text: "Até 200 agendamentos/mês", included: true },
       { text: "Página de agendamento", included: true },
@@ -51,7 +67,7 @@ const plans = [
       { text: "Gestão de clientes", included: true },
       { text: "WhatsApp automático", included: true },
       { text: "Lembretes automáticos", included: true },
-      { text: "Relatórios avançados", included: false },
+      { text: "600 créditos/mês", included: true },
     ],
   },
   {
@@ -62,27 +78,45 @@ const plans = [
     icon: Crown,
     color: "text-purple-500",
     bgColor: "bg-purple-500/10",
+    credits: 2500,
     features: [
       { text: "Agendamentos ilimitados", included: true },
       { text: "Página de agendamento", included: true },
       { text: "QR Code personalizado", included: true },
       { text: "Gestão de clientes", included: true },
-      { text: "WhatsApp automático", included: true },
-      { text: "Lembretes automáticos", included: true },
-      { text: "Relatórios avançados", included: true },
+      { text: "WhatsApp inteligente", included: true },
+      { text: "Agendamento via WhatsApp", included: true },
+      { text: "2.500 créditos/mês", included: true },
     ],
   },
 ];
 
 export default function Planos() {
   const { subscription, loading, changePlan } = useSubscription();
+  const { creditInfo, loading: creditsLoading, addExtraCredits, getUsagePercentage, packages } = useCredits();
+  const [buyCreditsOpen, setBuyCreditsOpen] = useState(false);
+  const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
+  const [purchasing, setPurchasing] = useState(false);
 
   const handleChangePlan = async (plan: SubscriptionPlan) => {
     if (subscription?.plan === plan) return;
     await changePlan(plan);
   };
 
-  if (loading) {
+  const handleBuyCredits = async () => {
+    if (!selectedPackage) return;
+    const pkg = packages.find(p => p.id === selectedPackage);
+    if (!pkg) return;
+
+    setPurchasing(true);
+    // Simulate payment - in production this would integrate with payment gateway
+    await addExtraCredits(pkg.credits);
+    setPurchasing(false);
+    setBuyCreditsOpen(false);
+    setSelectedPackage(null);
+  };
+
+  if (loading || creditsLoading) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center h-full">
@@ -99,13 +133,13 @@ export default function Planos() {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12"
+          className="text-center mb-8"
         >
           <h1 className="text-2xl lg:text-3xl font-bold text-foreground mb-2">
-            Planos & Preços
+            Planos & Créditos
           </h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Escolha o plano ideal para o seu negócio. Faça upgrade ou downgrade a qualquer momento.
+            Escolha o plano ideal para o seu negócio. Cada mensagem WhatsApp consome 1 crédito.
           </p>
           {subscription && (
             <div className="mt-4 inline-flex items-center gap-2">
@@ -122,12 +156,60 @@ export default function Planos() {
           )}
         </motion.div>
 
+        {/* Credits Card */}
+        {creditInfo && (subscription?.plan === 'pro' || subscription?.plan === 'premium') && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.05 }}
+            className="mb-8"
+          >
+            <Card variant="highlight" className="p-6">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Sparkles className="w-5 h-5 text-highlight" />
+                    <h3 className="font-semibold text-lg text-foreground">Seus Créditos WhatsApp</h3>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <p className="text-2xl font-bold text-foreground">{creditInfo.availableCredits}</p>
+                      <p className="text-sm text-muted-foreground">Disponíveis</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-foreground">{creditInfo.creditsUsed}</p>
+                      <p className="text-sm text-muted-foreground">Usados este mês</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-foreground">{creditInfo.extraCredits}</p>
+                      <p className="text-sm text-muted-foreground">Extras (não expiram)</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Consumo mensal</span>
+                      <span className="text-foreground">{getUsagePercentage()}%</span>
+                    </div>
+                    <Progress value={getUsagePercentage()} className="h-2" />
+                  </div>
+                </div>
+                <div>
+                  <Button variant="hero" onClick={() => setBuyCreditsOpen(true)}>
+                    <Gift className="w-4 h-4 mr-2" />
+                    Comprar Créditos
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </motion.div>
+        )}
+
         {/* Features Summary */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-12"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8"
         >
           <Card variant="elevated" className="p-4">
             <div className="flex items-center gap-3">
@@ -170,13 +252,13 @@ export default function Planos() {
           </Card>
           <Card variant="elevated" className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                <Users className="w-5 h-5 text-purple-600" />
+              <div className="w-10 h-10 rounded-lg bg-highlight/10 flex items-center justify-center">
+                <CreditCard className="w-5 h-5 text-highlight" />
               </div>
               <div>
-                <p className="font-semibold text-foreground">Status</p>
-                <p className="text-sm text-muted-foreground capitalize">
-                  {subscription?.status || 'trial'}
+                <p className="font-semibold text-foreground">Créditos/mês</p>
+                <p className="text-sm text-muted-foreground">
+                  {PLAN_CREDITS[subscription?.plan || 'basic'] || 0}
                 </p>
               </div>
             </div>
@@ -184,7 +266,7 @@ export default function Planos() {
         </motion.div>
 
         {/* Plans Grid */}
-        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-12">
           {plans.map((plan, index) => {
             const isCurrentPlan = subscription?.plan === plan.id;
             const Icon = plan.icon;
@@ -221,6 +303,14 @@ export default function Planos() {
                     </div>
                     <CardTitle className="text-xl">{plan.name}</CardTitle>
                     <p className="text-muted-foreground text-sm">{plan.description}</p>
+                    {plan.credits > 0 && (
+                      <div className="mt-2">
+                        <Badge className="bg-highlight/10 text-highlight border-highlight/20">
+                          <MessageSquare className="w-3 h-3 mr-1" />
+                          {plan.credits} créditos/mês
+                        </Badge>
+                      </div>
+                    )}
                   </CardHeader>
 
                   <CardContent className="space-y-6">
@@ -261,17 +351,69 @@ export default function Planos() {
           })}
         </div>
 
+        {/* Credit Packages */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="max-w-4xl mx-auto mb-12"
+        >
+          <h2 className="text-xl font-bold text-foreground text-center mb-6">
+            Créditos Avulsos
+          </h2>
+          <p className="text-muted-foreground text-center mb-6">
+            Compre créditos extras que não expiram. Use quando precisar de mais mensagens!
+          </p>
+          <div className="grid md:grid-cols-3 gap-4">
+            {CREDIT_PACKAGES.map((pkg) => (
+              <Card 
+                key={pkg.id}
+                variant="elevated" 
+                className={`p-6 text-center ${pkg.popular ? 'ring-2 ring-highlight' : ''}`}
+              >
+                {pkg.popular && (
+                  <Badge variant="highlight" className="mb-4">
+                    Mais vendido
+                  </Badge>
+                )}
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <MessageSquare className="w-5 h-5 text-highlight" />
+                  <span className="text-2xl font-bold text-foreground">{pkg.credits}</span>
+                </div>
+                <p className="text-muted-foreground mb-4">créditos</p>
+                <p className="text-xl font-bold text-foreground mb-4">R${pkg.price}</p>
+                <Button 
+                  variant={pkg.popular ? "hero" : "outline"} 
+                  className="w-full"
+                  onClick={() => {
+                    setSelectedPackage(pkg.id);
+                    setBuyCreditsOpen(true);
+                  }}
+                >
+                  Comprar
+                </Button>
+              </Card>
+            ))}
+          </div>
+        </motion.div>
+
         {/* FAQ */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
-          className="mt-16 max-w-3xl mx-auto"
+          className="max-w-3xl mx-auto"
         >
           <h2 className="text-xl font-bold text-foreground text-center mb-8">
             Perguntas Frequentes
           </h2>
           <div className="space-y-4">
+            <Card variant="elevated" className="p-4">
+              <h3 className="font-semibold text-foreground mb-2">O que são créditos?</h3>
+              <p className="text-muted-foreground text-sm">
+                Cada mensagem WhatsApp enviada (confirmação, lembrete ou mensagem do bot) consome 1 crédito. Os créditos do plano renovam mensalmente, já os créditos extras nunca expiram.
+              </p>
+            </Card>
             <Card variant="elevated" className="p-4">
               <h3 className="font-semibold text-foreground mb-2">Posso mudar de plano a qualquer momento?</h3>
               <p className="text-muted-foreground text-sm">
@@ -279,19 +421,68 @@ export default function Planos() {
               </p>
             </Card>
             <Card variant="elevated" className="p-4">
-              <h3 className="font-semibold text-foreground mb-2">O período de trial inclui todas as funcionalidades?</h3>
+              <h3 className="font-semibold text-foreground mb-2">O que acontece se meus créditos acabarem?</h3>
               <p className="text-muted-foreground text-sm">
-                O trial de 14 dias inclui as funcionalidades do plano Essencial. Faça upgrade para testar recursos avançados.
+                O bot WhatsApp é pausado automaticamente. Você pode comprar créditos avulsos ou aguardar a renovação mensal para continuar enviando mensagens.
               </p>
             </Card>
             <Card variant="elevated" className="p-4">
               <h3 className="font-semibold text-foreground mb-2">Como funciona o WhatsApp automático?</h3>
               <p className="text-muted-foreground text-sm">
-                Nos planos Pro e Master, o sistema envia automaticamente confirmações e lembretes via WhatsApp para seus clientes.
+                Nos planos Pro e Master, o sistema envia automaticamente confirmações e lembretes via WhatsApp para seus clientes usando a API oficial do Twilio.
               </p>
             </Card>
           </div>
         </motion.div>
+
+        {/* Buy Credits Dialog */}
+        <Dialog open={buyCreditsOpen} onOpenChange={setBuyCreditsOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Gift className="w-5 h-5 text-highlight" />
+                Comprar Créditos
+              </DialogTitle>
+              <DialogDescription>
+                Selecione o pacote de créditos desejado. Créditos extras não expiram!
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-3">
+              {CREDIT_PACKAGES.map((pkg) => (
+                <div
+                  key={pkg.id}
+                  onClick={() => setSelectedPackage(pkg.id)}
+                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    selectedPackage === pkg.id 
+                      ? 'border-highlight bg-highlight/5' 
+                      : 'border-border hover:border-highlight/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <MessageSquare className="w-5 h-5 text-highlight" />
+                      <span className="font-semibold text-foreground">{pkg.credits} créditos</span>
+                      {pkg.popular && <Badge variant="highlight" className="text-xs">Popular</Badge>}
+                    </div>
+                    <span className="font-bold text-foreground">R${pkg.price}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setBuyCreditsOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleBuyCredits} 
+                disabled={!selectedPackage || purchasing}
+              >
+                {purchasing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CreditCard className="w-4 h-4 mr-2" />}
+                Confirmar Compra
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );

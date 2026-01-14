@@ -18,6 +18,11 @@ export interface AdminUser {
     whatsapp_bot_override: boolean | null;
     whatsapp_bot_trial_until: string | null;
     whatsapp_enabled: boolean;
+    // Credit fields
+    monthly_credits: number;
+    extra_credits: number;
+    credits_used: number;
+    credits_reset_at: string | null;
   };
   role?: string;
 }
@@ -37,7 +42,7 @@ export function useAdminData() {
 
       if (profilesError) throw profilesError;
 
-      // Fetch all subscriptions
+      // Fetch all subscriptions with credit fields
       const { data: subscriptions, error: subsError } = await supabase
         .from('subscriptions')
         .select('*');
@@ -67,6 +72,11 @@ export function useAdminData() {
             whatsapp_bot_override: sub.whatsapp_bot_override ?? null,
             whatsapp_bot_trial_until: sub.whatsapp_bot_trial_until ?? null,
             whatsapp_enabled: sub.whatsapp_enabled ?? false,
+            // Credit fields
+            monthly_credits: sub.monthly_credits ?? 0,
+            extra_credits: sub.extra_credits ?? 0,
+            credits_used: sub.credits_used ?? 0,
+            credits_reset_at: sub.credits_reset_at ?? null,
           } : undefined,
           role: userRole?.role || 'user',
         };
@@ -93,6 +103,9 @@ export function useAdminData() {
       whatsapp_bot_enabled?: boolean;
       whatsapp_bot_override?: boolean | null;
       whatsapp_bot_trial_until?: string | null;
+      monthly_credits?: number;
+      extra_credits?: number;
+      credits_used?: number;
     }
   ) => {
     try {
@@ -170,6 +183,58 @@ export function useAdminData() {
     return updateUserSubscription(userId, { whatsapp_bot_trial_until: null });
   };
 
+  // Credit management functions
+  const grantExtraCredits = async (userId: string, amount: number) => {
+    try {
+      const { error } = await supabase.rpc('add_extra_credits', {
+        p_user_id: userId,
+        p_amount: amount,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Créditos concedidos',
+        description: `${amount} créditos adicionados com sucesso.`,
+      });
+
+      await fetchAllUsers();
+      return { error: null };
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao adicionar créditos',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return { error };
+    }
+  };
+
+  const resetUserCredits = async (userId: string) => {
+    try {
+      const { error } = await supabase.rpc('reset_monthly_credits', {
+        p_user_id: userId,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Créditos resetados',
+        description: 'Créditos mensais foram renovados.',
+      });
+
+      await fetchAllUsers();
+      return { error: null };
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao resetar créditos',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return { error };
+    }
+  };
+
   useEffect(() => {
     fetchAllUsers();
   }, []);
@@ -182,6 +247,8 @@ export function useAdminData() {
     toggleBotOverride,
     grantBotTrial,
     revokeBotTrial,
+    grantExtraCredits,
+    resetUserCredits,
     refetch: fetchAllUsers 
   };
 }

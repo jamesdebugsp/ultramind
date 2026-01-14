@@ -11,13 +11,16 @@ import {
   Shield,
   Bot,
   MessageSquare,
-  Calendar,
   Zap,
+  Gift,
+  Sparkles,
+  RefreshCw,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -62,13 +65,21 @@ export default function AdminPanel() {
     toggleBotOverride,
     grantBotTrial,
     revokeBotTrial,
+    grantExtraCredits,
+    resetUserCredits,
+    refetch,
   } = useAdminData();
   
   const [trialDialog, setTrialDialog] = useState<{ open: boolean; user: AdminUser | null }>({ 
     open: false, 
     user: null 
   });
+  const [creditsDialog, setCreditsDialog] = useState<{ open: boolean; user: AdminUser | null }>({ 
+    open: false, 
+    user: null 
+  });
   const [trialDays, setTrialDays] = useState(7);
+  const [creditsAmount, setCreditsAmount] = useState(100);
 
   // Redirect if not super admin
   useEffect(() => {
@@ -113,6 +124,10 @@ export default function AdminPanel() {
     const planAllows = sub.plan === "pro" || sub.plan === "premium";
     const isActive = sub.status === "active" || sub.status === "trial";
     
+    // Check credits
+    const availableCredits = (sub.monthly_credits + sub.extra_credits) - sub.credits_used;
+    const hasCredits = availableCredits > 0;
+    
     // Check trial
     const trialActive = sub.whatsapp_bot_trial_until && new Date(sub.whatsapp_bot_trial_until) > new Date();
     
@@ -120,9 +135,9 @@ export default function AdminPanel() {
     if (sub.whatsapp_bot_override !== null) {
       if (sub.whatsapp_bot_override) {
         return { 
-          active: hasWhatsapp && isActive, 
-          label: hasWhatsapp && isActive ? "Forçado ON" : "Override ON (sem WhatsApp)", 
-          color: "text-emerald-600",
+          active: hasWhatsapp && isActive && hasCredits, 
+          label: hasCredits ? "Forçado ON" : "Override ON (sem créditos)", 
+          color: hasCredits ? "text-emerald-600" : "text-amber-600",
           isOverride: true,
         };
       } else {
@@ -140,7 +155,7 @@ export default function AdminPanel() {
       const trialEnd = new Date(sub.whatsapp_bot_trial_until!);
       const daysLeft = Math.ceil((trialEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
       return { 
-        active: hasWhatsapp && isActive, 
+        active: hasWhatsapp && isActive && hasCredits, 
         label: `Trial (${daysLeft}d)`, 
         color: "text-amber-600",
         isTrial: true,
@@ -156,6 +171,10 @@ export default function AdminPanel() {
       return { active: false, label: "Sem WhatsApp", color: "text-amber-600" };
     }
 
+    if (!hasCredits) {
+      return { active: false, label: "Sem créditos", color: "text-destructive" };
+    }
+
     if (!isActive) {
       return { active: false, label: "Assinatura inativa", color: "text-destructive" };
     }
@@ -167,13 +186,26 @@ export default function AdminPanel() {
     };
   };
 
+  const getCreditsInfo = (user: AdminUser) => {
+    const sub = user.subscription;
+    if (!sub) return { available: 0, used: 0, total: 0, extra: 0 };
+    
+    const total = sub.monthly_credits + sub.extra_credits;
+    const available = Math.max(0, total - sub.credits_used);
+    
+    return {
+      available,
+      used: sub.credits_used,
+      total,
+      extra: sub.extra_credits,
+      monthly: sub.monthly_credits,
+    };
+  };
+
   const handleBotToggle = async (user: AdminUser, currentlyOn: boolean) => {
-    // If currently has override, we toggle it
     if (user.subscription?.whatsapp_bot_override !== null) {
-      // Toggle override value
       await toggleBotOverride(user.user_id, !currentlyOn);
     } else {
-      // Set new override
       await toggleBotOverride(user.user_id, !currentlyOn);
     }
   };
@@ -189,12 +221,23 @@ export default function AdminPanel() {
     }
   };
 
+  const handleGrantCredits = async () => {
+    if (creditsDialog.user && creditsAmount > 0) {
+      await grantExtraCredits(creditsDialog.user.user_id, creditsAmount);
+      setCreditsDialog({ open: false, user: null });
+      setCreditsAmount(100);
+    }
+  };
+
+  // Calculate stats
+  const totalCreditsUsed = users.reduce((acc, u) => acc + (u.subscription?.credits_used || 0), 0);
   const stats = {
     total: users.length,
     active: users.filter(u => u.subscription?.status === "active").length,
     trial: users.filter(u => u.subscription?.status === "trial").length,
     inactive: users.filter(u => u.subscription?.status === "inactive" || u.subscription?.status === "cancelled").length,
     botActive: users.filter(u => getBotStatus(u).active).length,
+    totalCreditsUsed,
   };
 
   if (rolesLoading || usersLoading) {
@@ -229,18 +272,24 @@ export default function AdminPanel() {
           animate={{ opacity: 1, y: 0 }}
           className="mb-8"
         >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center">
-              <Shield className="w-5 h-5 text-destructive" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center">
+                <Shield className="w-5 h-5 text-destructive" />
+              </div>
+              <div>
+                <h1 className="text-2xl lg:text-3xl font-bold text-foreground">
+                  Painel Administrativo
+                </h1>
+                <p className="text-muted-foreground">
+                  Gerencie usuários, créditos e controle do bot WhatsApp
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl lg:text-3xl font-bold text-foreground">
-                Painel Administrativo
-              </h1>
-              <p className="text-muted-foreground">
-                Gerencie todos os usuários e controle do bot WhatsApp
-              </p>
-            </div>
+            <Button variant="outline" onClick={() => refetch()}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Atualizar
+            </Button>
           </div>
         </motion.div>
 
@@ -249,7 +298,7 @@ export default function AdminPanel() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8"
+          className="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-8"
         >
           <Card variant="elevated" className="p-4">
             <div className="flex items-center gap-3">
@@ -306,6 +355,17 @@ export default function AdminPanel() {
               </div>
             </div>
           </Card>
+          <Card variant="elevated" className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                <Sparkles className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-foreground">{stats.totalCreditsUsed}</p>
+                <p className="text-sm text-muted-foreground">Créditos Usados</p>
+              </div>
+            </div>
+          </Card>
         </motion.div>
 
         {/* Users Table */}
@@ -327,32 +387,39 @@ export default function AdminPanel() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Empresa</TableHead>
-                      <TableHead>Responsável</TableHead>
                       <TableHead>WhatsApp</TableHead>
                       <TableHead>Plano</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>
                         <div className="flex items-center gap-1">
-                          <Bot className="w-4 h-4" />
-                          Bot WhatsApp
+                          <Sparkles className="w-4 h-4" />
+                          Créditos
                         </div>
                       </TableHead>
-                      <TableHead>Ações Bot</TableHead>
-                      <TableHead>Ações Plano</TableHead>
+                      <TableHead>
+                        <div className="flex items-center gap-1">
+                          <Bot className="w-4 h-4" />
+                          Bot
+                        </div>
+                      </TableHead>
+                      <TableHead>Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {users.map((user) => {
                       const botStatus = getBotStatus(user);
+                      const credits = getCreditsInfo(user);
                       return (
                         <TableRow key={user.id}>
-                          <TableCell className="font-medium">
-                            {user.business_name || "—"}
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{user.business_name || "—"}</p>
+                              <p className="text-xs text-muted-foreground">{user.owner_name || "—"}</p>
+                            </div>
                           </TableCell>
-                          <TableCell>{user.owner_name || "—"}</TableCell>
                           <TableCell>
                             {user.whatsapp ? (
-                              <span className="text-emerald-600 flex items-center gap-1">
+                              <span className="text-emerald-600 flex items-center gap-1 text-sm">
                                 <MessageSquare className="w-3 h-3" />
                                 {user.whatsapp}
                               </span>
@@ -365,6 +432,27 @@ export default function AdminPanel() {
                           </TableCell>
                           <TableCell>
                             {user.subscription?.status ? getStatusBadge(user.subscription.status) : <Badge variant="secondary">—</Badge>}
+                          </TableCell>
+                          <TableCell>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div className="flex flex-col">
+                                    <span className={`font-semibold ${credits.available === 0 ? 'text-destructive' : credits.available <= 50 ? 'text-amber-600' : 'text-foreground'}`}>
+                                      {credits.available}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                      {credits.used} usados
+                                    </span>
+                                  </div>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Mensal: {credits.monthly}</p>
+                                  <p>Extra: {credits.extra}</p>
+                                  <p>Usado: {credits.used}</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                           </TableCell>
                           <TableCell>
                             <TooltipProvider>
@@ -383,34 +471,45 @@ export default function AdminPanel() {
                                 </TooltipTrigger>
                                 <TooltipContent>
                                   <p>Toggle para forçar ON/OFF do bot</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    Override sobrepõe regras de plano
-                                  </p>
                                 </TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {/* Grant Credits */}
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setCreditsDialog({ open: true, user })}
+                                      className="h-7 px-2 text-xs"
+                                    >
+                                      <Gift className="w-3 h-3 mr-1" />
+                                      Créditos
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    Conceder créditos extras
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+
+                              {/* Clear Override */}
                               {user.subscription?.whatsapp_bot_override !== null && (
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => handleClearOverride(user.user_id)}
-                                        className="h-7 px-2 text-xs"
-                                      >
-                                        Limpar
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      Remover override e usar regras do plano
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleClearOverride(user.user_id)}
+                                  className="h-7 px-2 text-xs"
+                                >
+                                  Limpar
+                                </Button>
                               )}
+
+                              {/* Grant Trial */}
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
@@ -425,29 +524,17 @@ export default function AdminPanel() {
                                     </Button>
                                   </TooltipTrigger>
                                   <TooltipContent>
-                                    Conceder período de teste do bot
+                                    Conceder período de teste
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
-                              {user.subscription?.whatsapp_bot_trial_until && new Date(user.subscription.whatsapp_bot_trial_until) > new Date() && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => revokeBotTrial(user.user_id)}
-                                  className="h-7 px-2 text-xs text-destructive"
-                                >
-                                  Revogar
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
+
+                              {/* Plan/Status Selects */}
                               <Select
                                 value={user.subscription?.plan || 'basic'}
                                 onValueChange={(value: 'basic' | 'pro' | 'premium') => updateUserSubscription(user.user_id, { plan: value })}
                               >
-                                <SelectTrigger className="w-24 h-8">
+                                <SelectTrigger className="w-20 h-7 text-xs">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -460,7 +547,7 @@ export default function AdminPanel() {
                                 value={user.subscription?.status || 'trial'}
                                 onValueChange={(value: 'active' | 'trial' | 'inactive' | 'cancelled') => updateUserSubscription(user.user_id, { status: value })}
                               >
-                                <SelectTrigger className="w-24 h-8">
+                                <SelectTrigger className="w-20 h-7 text-xs">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -516,6 +603,61 @@ export default function AdminPanel() {
               <Button onClick={handleGrantTrial}>
                 <Zap className="w-4 h-4 mr-2" />
                 Conceder Trial
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Credits Dialog */}
+        <Dialog open={creditsDialog.open} onOpenChange={(open) => setCreditsDialog({ open, user: open ? creditsDialog.user : null })}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Gift className="w-5 h-5 text-highlight" />
+                Conceder Créditos Extras
+              </DialogTitle>
+              <DialogDescription>
+                Adicionar créditos extras para{" "}
+                <strong>{creditsDialog.user?.business_name || creditsDialog.user?.owner_name}</strong>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              <div>
+                <label className="text-sm font-medium">Créditos atuais</label>
+                <p className="text-muted-foreground">
+                  {creditsDialog.user && getCreditsInfo(creditsDialog.user).available} disponíveis
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Quantidade a adicionar</label>
+                <Input
+                  type="number"
+                  value={creditsAmount}
+                  onChange={(e) => setCreditsAmount(parseInt(e.target.value) || 0)}
+                  min={1}
+                  className="mt-2"
+                />
+              </div>
+              <div className="flex gap-2">
+                {[50, 100, 300, 600].map((amount) => (
+                  <Button
+                    key={amount}
+                    variant={creditsAmount === amount ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCreditsAmount(amount)}
+                  >
+                    {amount}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCreditsDialog({ open: false, user: null })}>
+                Cancelar
+              </Button>
+              <Button onClick={handleGrantCredits} disabled={creditsAmount <= 0}>
+                <Gift className="w-4 h-4 mr-2" />
+                Conceder {creditsAmount} Créditos
               </Button>
             </DialogFooter>
           </DialogContent>
