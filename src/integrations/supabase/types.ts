@@ -214,6 +214,90 @@ export type Database = {
         }
         Relationships: []
       }
+      payments: {
+        Row: {
+          amount: number
+          boleto_barcode: string | null
+          boleto_expiration: string | null
+          boleto_url: string | null
+          card_brand: string | null
+          card_last_four: string | null
+          created_at: string
+          credits_amount: number | null
+          currency: string
+          expires_at: string | null
+          external_id: string | null
+          external_reference: string | null
+          id: string
+          installments: number | null
+          metadata: Json | null
+          paid_at: string | null
+          payment_method: string | null
+          pix_copy_paste: string | null
+          pix_qr_code: string | null
+          pix_qr_code_base64: string | null
+          plan: string | null
+          status: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          boleto_barcode?: string | null
+          boleto_expiration?: string | null
+          boleto_url?: string | null
+          card_brand?: string | null
+          card_last_four?: string | null
+          created_at?: string
+          credits_amount?: number | null
+          currency?: string
+          expires_at?: string | null
+          external_id?: string | null
+          external_reference?: string | null
+          id?: string
+          installments?: number | null
+          metadata?: Json | null
+          paid_at?: string | null
+          payment_method?: string | null
+          pix_copy_paste?: string | null
+          pix_qr_code?: string | null
+          pix_qr_code_base64?: string | null
+          plan?: string | null
+          status?: string
+          type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          boleto_barcode?: string | null
+          boleto_expiration?: string | null
+          boleto_url?: string | null
+          card_brand?: string | null
+          card_last_four?: string | null
+          created_at?: string
+          credits_amount?: number | null
+          currency?: string
+          expires_at?: string | null
+          external_id?: string | null
+          external_reference?: string | null
+          id?: string
+          installments?: number | null
+          metadata?: Json | null
+          paid_at?: string | null
+          payment_method?: string | null
+          pix_copy_paste?: string | null
+          pix_qr_code?: string | null
+          pix_qr_code_base64?: string | null
+          plan?: string | null
+          status?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       posts: {
         Row: {
           content: string | null
@@ -702,6 +786,10 @@ export type Database = {
       is_platform_owner_email: { Args: { email: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_whatsapp_bot_active: { Args: { p_user_id: string }; Returns: boolean }
+      process_approved_payment: {
+        Args: { p_payment_id: string }
+        Returns: boolean
+      }
       reset_monthly_credits: { Args: { p_user_id: string }; Returns: undefined }
     }
     Enums: {
