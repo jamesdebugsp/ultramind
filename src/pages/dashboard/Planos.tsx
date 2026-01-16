@@ -9,8 +9,6 @@ import {
   MessageSquare,
   Bell,
   Calendar,
-  Users,
-  Gift,
   CreditCard,
   Sparkles,
 } from "lucide-react";
@@ -18,17 +16,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { useSubscription, SubscriptionPlan } from "@/hooks/useSubscription";
 import { useCredits, CREDIT_PACKAGES, PLAN_CREDITS } from "@/hooks/useCredits";
+import { PaymentModal } from "@/components/payments/PaymentModal";
 
 const plans = [
   {
@@ -92,28 +83,43 @@ const plans = [
 ];
 
 export default function Planos() {
-  const { subscription, loading, changePlan } = useSubscription();
-  const { creditInfo, loading: creditsLoading, addExtraCredits, getUsagePercentage, packages } = useCredits();
-  const [buyCreditsOpen, setBuyCreditsOpen] = useState(false);
-  const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
-  const [purchasing, setPurchasing] = useState(false);
+  const { subscription, loading, refetch: refetchSubscription } = useSubscription();
+  const { creditInfo, loading: creditsLoading, getUsagePercentage, packages, refetch: refetchCredits } = useCredits();
+  
+  // Payment modal state
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [paymentType, setPaymentType] = useState<'plan' | 'credits'>('plan');
+  const [selectedPlan, setSelectedPlan] = useState<'basic' | 'pro' | 'premium'>('basic');
+  const [selectedPackage, setSelectedPackage] = useState<'pack_300' | 'pack_800' | 'pack_2000'>('pack_300');
+  const [paymentAmount, setPaymentAmount] = useState(0);
+  const [paymentDescription, setPaymentDescription] = useState('');
 
-  const handleChangePlan = async (plan: SubscriptionPlan) => {
+  const handleSelectPlan = (plan: SubscriptionPlan) => {
     if (subscription?.plan === plan) return;
-    await changePlan(plan);
+    const planData = plans.find(p => p.id === plan);
+    if (!planData) return;
+    
+    setPaymentType('plan');
+    setSelectedPlan(plan);
+    setPaymentAmount(planData.price);
+    setPaymentDescription(`Plano ${planData.name}`);
+    setPaymentModalOpen(true);
   };
 
-  const handleBuyCredits = async () => {
-    if (!selectedPackage) return;
-    const pkg = packages.find(p => p.id === selectedPackage);
+  const handleBuyCredits = (packageId: string) => {
+    const pkg = packages.find(p => p.id === packageId);
     if (!pkg) return;
+    
+    setPaymentType('credits');
+    setSelectedPackage(packageId as 'pack_300' | 'pack_800' | 'pack_2000');
+    setPaymentAmount(pkg.price);
+    setPaymentDescription(`${pkg.credits} créditos WhatsApp`);
+    setPaymentModalOpen(true);
+  };
 
-    setPurchasing(true);
-    // Simulate payment - in production this would integrate with payment gateway
-    await addExtraCredits(pkg.credits);
-    setPurchasing(false);
-    setBuyCreditsOpen(false);
-    setSelectedPackage(null);
+  const handlePaymentSuccess = () => {
+    refetchSubscription();
+    refetchCredits();
   };
 
   if (loading || creditsLoading) {
@@ -340,9 +346,9 @@ export default function Planos() {
                       variant={isCurrentPlan ? "outline" : plan.popular ? "hero" : "default"}
                       className="w-full"
                       disabled={isCurrentPlan}
-                      onClick={() => handleChangePlan(plan.id)}
+                      onClick={() => handleSelectPlan(plan.id)}
                     >
-                      {isCurrentPlan ? 'Plano atual' : subscription?.plan && plans.findIndex(p => p.id === subscription.plan) > plans.findIndex(p => p.id === plan.id) ? 'Fazer downgrade' : 'Fazer upgrade'}
+                      {isCurrentPlan ? 'Plano atual' : subscription?.plan && plans.findIndex(p => p.id === subscription.plan) > plans.findIndex(p => p.id === plan.id) ? 'Fazer downgrade' : 'Assinar agora'}
                     </Button>
                   </CardContent>
                 </Card>
@@ -385,10 +391,7 @@ export default function Planos() {
                 <Button 
                   variant={pkg.popular ? "hero" : "outline"} 
                   className="w-full"
-                  onClick={() => {
-                    setSelectedPackage(pkg.id);
-                    setBuyCreditsOpen(true);
-                  }}
+                  onClick={() => handleBuyCredits(pkg.id)}
                 >
                   Comprar
                 </Button>
