@@ -1,5 +1,11 @@
 project_id = "qlelriizivotepmgbtuo"
 
+[functions.payment-webhook]
+verify_jwt = false
+
+[functions.create-payment]
+verify_jwt = false
+
 [functions.send-whatsapp-confirmation]
 verify_jwt = false
 
