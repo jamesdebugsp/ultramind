@@ -117,6 +117,18 @@ export default function Planos() {
     setPaymentModalOpen(true);
   };
 
+  const handleOpenCreditsModal = () => {
+    // Default to the most popular package
+    const popularPkg = packages.find(p => p.popular) || packages[0];
+    if (popularPkg) {
+      setPaymentType('credits');
+      setSelectedPackage(popularPkg.id as 'pack_300' | 'pack_800' | 'pack_2000');
+      setPaymentAmount(popularPkg.price);
+      setPaymentDescription(`${popularPkg.credits} créditos WhatsApp`);
+      setPaymentModalOpen(true);
+    }
+  };
+
   const handlePaymentSuccess = () => {
     refetchSubscription();
     refetchCredits();
@@ -200,8 +212,13 @@ export default function Planos() {
                   </div>
                 </div>
                 <div>
-                  <Button variant="hero" onClick={() => setBuyCreditsOpen(true)}>
-                    <Gift className="w-4 h-4 mr-2" />
+                  <Button 
+                    variant="hero" 
+                    onClick={handleOpenCreditsModal}
+                    aria-label="Comprar créditos WhatsApp extras"
+                    className="cursor-pointer"
+                  >
+                    <CreditCard className="w-4 h-4 mr-2" />
                     Comprar Créditos
                   </Button>
                 </div>
@@ -286,7 +303,17 @@ export default function Planos() {
               >
                 <Card
                   variant="elevated"
-                  className={`relative h-full ${plan.popular ? 'ring-2 ring-highlight' : ''} ${isCurrentPlan ? 'border-highlight bg-highlight/5' : ''}`}
+                  className={`relative h-full cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] focus-within:ring-2 focus-within:ring-highlight ${plan.popular ? 'ring-2 ring-highlight' : ''} ${isCurrentPlan ? 'border-highlight bg-highlight/5' : ''}`}
+                  onClick={() => !isCurrentPlan && handleSelectPlan(plan.id)}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Selecionar plano ${plan.name} por R$${plan.price} por mês`}
+                  onKeyDown={(e) => {
+                    if ((e.key === 'Enter' || e.key === ' ') && !isCurrentPlan) {
+                      e.preventDefault();
+                      handleSelectPlan(plan.id);
+                    }
+                  }}
                 >
                   {plan.popular && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2">
@@ -344,9 +371,13 @@ export default function Planos() {
 
                     <Button
                       variant={isCurrentPlan ? "outline" : plan.popular ? "hero" : "default"}
-                      className="w-full"
+                      className="w-full cursor-pointer"
                       disabled={isCurrentPlan}
-                      onClick={() => handleSelectPlan(plan.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelectPlan(plan.id);
+                      }}
+                      aria-label={isCurrentPlan ? 'Este é seu plano atual' : `Assinar plano ${plan.name}`}
                     >
                       {isCurrentPlan ? 'Plano atual' : subscription?.plan && plans.findIndex(p => p.id === subscription.plan) > plans.findIndex(p => p.id === plan.id) ? 'Fazer downgrade' : 'Assinar agora'}
                     </Button>
@@ -375,7 +406,17 @@ export default function Planos() {
               <Card 
                 key={pkg.id}
                 variant="elevated" 
-                className={`p-6 text-center ${pkg.popular ? 'ring-2 ring-highlight' : ''}`}
+                className={`p-6 text-center cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] focus-within:ring-2 focus-within:ring-highlight ${pkg.popular ? 'ring-2 ring-highlight' : ''}`}
+                onClick={() => handleBuyCredits(pkg.id)}
+                role="button"
+                tabIndex={0}
+                aria-label={`Comprar ${pkg.credits} créditos por R$${pkg.price}`}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleBuyCredits(pkg.id);
+                  }
+                }}
               >
                 {pkg.popular && (
                   <Badge variant="highlight" className="mb-4">
@@ -390,8 +431,12 @@ export default function Planos() {
                 <p className="text-xl font-bold text-foreground mb-4">R${pkg.price}</p>
                 <Button 
                   variant={pkg.popular ? "hero" : "outline"} 
-                  className="w-full"
-                  onClick={() => handleBuyCredits(pkg.id)}
+                  className="w-full cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleBuyCredits(pkg.id);
+                  }}
+                  aria-label={`Comprar ${pkg.credits} créditos`}
                 >
                   Comprar
                 </Button>
@@ -438,54 +483,17 @@ export default function Planos() {
           </div>
         </motion.div>
 
-        {/* Buy Credits Dialog */}
-        <Dialog open={buyCreditsOpen} onOpenChange={setBuyCreditsOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Gift className="w-5 h-5 text-highlight" />
-                Comprar Créditos
-              </DialogTitle>
-              <DialogDescription>
-                Selecione o pacote de créditos desejado. Créditos extras não expiram!
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-4 space-y-3">
-              {CREDIT_PACKAGES.map((pkg) => (
-                <div
-                  key={pkg.id}
-                  onClick={() => setSelectedPackage(pkg.id)}
-                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                    selectedPackage === pkg.id 
-                      ? 'border-highlight bg-highlight/5' 
-                      : 'border-border hover:border-highlight/50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <MessageSquare className="w-5 h-5 text-highlight" />
-                      <span className="font-semibold text-foreground">{pkg.credits} créditos</span>
-                      {pkg.popular && <Badge variant="highlight" className="text-xs">Popular</Badge>}
-                    </div>
-                    <span className="font-bold text-foreground">R${pkg.price}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setBuyCreditsOpen(false)}>
-                Cancelar
-              </Button>
-              <Button 
-                onClick={handleBuyCredits} 
-                disabled={!selectedPackage || purchasing}
-              >
-                {purchasing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CreditCard className="w-4 h-4 mr-2" />}
-                Confirmar Compra
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        {/* Payment Modal */}
+        <PaymentModal
+          open={paymentModalOpen}
+          onOpenChange={setPaymentModalOpen}
+          type={paymentType}
+          plan={selectedPlan}
+          creditsPackage={selectedPackage}
+          amount={paymentAmount}
+          description={paymentDescription}
+          onSuccess={handlePaymentSuccess}
+        />
       </div>
     </DashboardLayout>
   );
