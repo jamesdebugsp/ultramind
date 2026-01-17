@@ -3,6 +3,8 @@ import { Check, Sparkles, Star, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const plans = [
   {
@@ -65,6 +67,17 @@ const plans = [
 ];
 
 export function PricingSection() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const handlePlanClick = () => {
+    if (user) {
+      navigate("/dashboard/planos");
+    } else {
+      navigate("/cadastro");
+    }
+  };
+
   return (
     <section id="planos" className="py-24 bg-background">
       <div className="container px-4">
@@ -165,7 +178,9 @@ export function PricingSection() {
                   <Button 
                     variant={plan.highlighted ? "hero" : "outline"} 
                     size="lg" 
-                    className="w-full"
+                    className="w-full cursor-pointer"
+                    onClick={handlePlanClick}
+                    aria-label={`Assinar plano ${plan.name} por R$${plan.price} por mês`}
                   >
                     {plan.cta}
                   </Button>
