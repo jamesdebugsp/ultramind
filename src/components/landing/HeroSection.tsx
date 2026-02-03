@@ -2,8 +2,11 @@ import { motion } from "framer-motion";
 import { Calendar, MessageCircle, Instagram, ArrowRight, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function HeroSection() {
+  const { user } = useAuth();
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden gradient-hero pt-20">
       {/* Background decoration */}
@@ -53,10 +56,10 @@ export function HeroSection() {
             className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12"
           >
             <Button variant="hero" size="xl" asChild>
-              <a href="#planos">
+              <Link to={user ? "/dashboard/planos" : "/cadastro"}>
                 Começar Grátis — 7 dias
                 <ArrowRight className="w-5 h-5 ml-2" />
-              </a>
+              </Link>
             </Button>
             <Button variant="hero-secondary" size="xl" asChild>
               <a href="#demo">Ver Demonstração</a>
