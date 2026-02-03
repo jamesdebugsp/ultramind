@@ -392,22 +392,25 @@ export function PaymentModal({
               exit={{ opacity: 0, scale: 0.95 }}
               className="text-center space-y-4"
             >
-              <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/10 flex items-center justify-center">
-                <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+              <div className="w-20 h-20 mx-auto rounded-full bg-emerald-500/10 flex items-center justify-center">
+                <CheckCircle2 className="w-10 h-10 text-emerald-600" />
               </div>
               
               <div>
-                <p className="text-lg font-semibold text-foreground">Pagamento confirmado!</p>
-                <p className="text-sm text-muted-foreground mt-2">
+                <p className="text-xl font-bold text-foreground">🎉 Pagamento confirmado!</p>
+                <p className="text-muted-foreground mt-2">
                   {type === 'plan' 
-                    ? `Seu plano ${PLAN_NAMES[plan || 'basic']} foi ativado.`
+                    ? `Seu plano ${PLAN_NAMES[plan || 'basic']} está ativo.`
                     : `${creditsPackage ? CREDIT_PACKAGE_NAMES[creditsPackage] : 'Créditos'} adicionados à sua conta.`
                   }
                 </p>
+                <p className="text-sm text-emerald-600 font-medium mt-3">
+                  Seu dashboard foi atualizado automaticamente!
+                </p>
               </div>
 
-              <Button onClick={() => onOpenChange(false)} className="w-full">
-                Fechar
+              <Button onClick={() => onOpenChange(false)} variant="hero" className="w-full">
+                Continuar para o Dashboard
               </Button>
             </motion.div>
           )}

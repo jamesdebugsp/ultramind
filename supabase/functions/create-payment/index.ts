@@ -135,7 +135,7 @@ serve(async (req) => {
       }
       amount = PLAN_PRICES[body.plan].price;
       planName = body.plan;
-      description = `UltraMind - Plano ${body.plan.charAt(0).toUpperCase() + body.plan.slice(1)}`;
+      description = `UltraMind Solutions - Plano ${body.plan.charAt(0).toUpperCase() + body.plan.slice(1)}`;
     } else if (body.type === "credits") {
       if (!body.credits_package || !CREDIT_PACKAGES[body.credits_package]) {
         throw new Error("Invalid credits package");
@@ -143,7 +143,7 @@ serve(async (req) => {
       const pkg = CREDIT_PACKAGES[body.credits_package];
       amount = pkg.price;
       creditsAmount = pkg.credits;
-      description = `UltraMind - ${pkg.credits} Créditos WhatsApp`;
+      description = `UltraMind Solutions - ${pkg.credits} Créditos WhatsApp`;
     } else {
       throw new Error("Invalid payment type");
     }

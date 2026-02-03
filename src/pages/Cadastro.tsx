@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Calendar, Mail, Lock, Eye, EyeOff, ArrowRight, User, Phone } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, ArrowRight, User, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -112,13 +112,11 @@ export default function Cadastro() {
       >
         {/* Logo */}
         <Link to="/" className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-12 h-12 rounded-xl gradient-accent flex items-center justify-center">
-            <Calendar className="w-6 h-6 text-primary-foreground" />
-          </div>
-          <div>
-            <span className="font-bold text-xl text-foreground">AgendePro</span>
-            <p className="text-xs text-muted-foreground">by UltraMind Solutions</p>
-          </div>
+          <img 
+            src="/lovable-uploads/bcdc5c69-c93a-473f-9c5f-4e5af7b0e9f5.png" 
+            alt="UltraMind Solutions" 
+            className="h-12 w-auto"
+          />
         </Link>
 
         <Card variant="elevated" className="p-8">
