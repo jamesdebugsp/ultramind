@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Check, Sparkles, Star, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -5,9 +6,11 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { PaymentModal } from "@/components/payments/PaymentModal";
 
 const plans = [
   {
+    id: "basic" as const,
     name: "Essencial",
     icon: Sparkles,
     price: 49,
@@ -25,6 +28,7 @@ const plans = [
     highlighted: false,
   },
   {
+    id: "pro" as const,
     name: "Profissional",
     icon: Star,
     price: 99,
@@ -45,6 +49,7 @@ const plans = [
     highlighted: true,
   },
   {
+    id: "premium" as const,
     name: "Master",
     icon: Crown,
     price: 199,
@@ -69,13 +74,29 @@ const plans = [
 export function PricingSection() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  
+  // Payment modal state
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<'basic' | 'pro' | 'premium'>('basic');
+  const [paymentAmount, setPaymentAmount] = useState(0);
+  const [paymentDescription, setPaymentDescription] = useState('');
 
-  const handlePlanClick = () => {
+  const handlePlanClick = (planId: 'basic' | 'pro' | 'premium', price: number, name: string) => {
     if (user) {
-      navigate("/dashboard/planos");
+      // User logged in - open payment modal directly
+      setSelectedPlan(planId);
+      setPaymentAmount(price);
+      setPaymentDescription(`Plano ${name}`);
+      setPaymentModalOpen(true);
     } else {
+      // User not logged in - redirect to signup
       navigate("/cadastro");
     }
+  };
+
+  const handlePaymentSuccess = () => {
+    // Redirect to dashboard after successful payment
+    navigate("/dashboard/planos");
   };
 
   return (
@@ -179,7 +200,7 @@ export function PricingSection() {
                     variant={plan.highlighted ? "hero" : "outline"} 
                     size="lg" 
                     className="w-full cursor-pointer"
-                    onClick={handlePlanClick}
+                    onClick={() => handlePlanClick(plan.id, plan.price, plan.name)}
                     aria-label={`Assinar plano ${plan.name} por R$${plan.price} por mês`}
                   >
                     {plan.cta}
@@ -189,6 +210,17 @@ export function PricingSection() {
             </motion.div>
           ))}
         </div>
+
+        {/* Payment Modal */}
+        <PaymentModal
+          open={paymentModalOpen}
+          onOpenChange={setPaymentModalOpen}
+          type="plan"
+          plan={selectedPlan}
+          amount={paymentAmount}
+          description={paymentDescription}
+          onSuccess={handlePaymentSuccess}
+        />
       </div>
     </section>
   );
