@@ -14,68 +14,161 @@ interface MercadoPagoWebhook {
   user_id: number;
   api_version: string;
   action: string;
+  data: { id: string };
+}
+
+// Helper: create admin alert
+async function createAlert(
+  supabase: ReturnType<typeof createClient>,
+  alertType: string,
+  severity: string,
+  title: string,
+  description: string,
+  metadata: Record<string, unknown> = {}
+) {
+  const { error } = await supabase.from("admin_alerts").insert({
+    alert_type: alertType,
+    severity,
+    title,
+    description,
+    metadata,
+  });
+  if (error) console.error("Failed to create alert:", error);
+}
+
+// Helper: log webhook event
+async function logWebhookEvent(
+  supabase: ReturnType<typeof createClient>,
   data: {
-    id: string;
-  };
+    event_type: string;
+    event_action?: string;
+    external_payment_id?: string;
+    external_reference?: string;
+    payment_id?: string;
+    status: string;
+    severity: string;
+    payload?: unknown;
+    response_data?: unknown;
+    error_message?: string;
+    processing_time_ms?: number;
+  }
+) {
+  const { error } = await supabase.from("webhook_logs").insert(data);
+  if (error) console.error("Failed to log webhook event:", error);
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const accessToken = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
+  const startTime = Date.now();
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+  let rawBody: string | undefined;
+
+  try {
+    const accessToken = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
     if (!accessToken) {
+      await logWebhookEvent(supabase, {
+        event_type: "config_error",
+        status: "error",
+        severity: "critical",
+        error_message: "MERCADOPAGO_ACCESS_TOKEN not configured",
+      });
+      await createAlert(supabase, "config_error", "critical",
+        "Token MP não configurado",
+        "MERCADOPAGO_ACCESS_TOKEN não está configurado no ambiente."
+      );
       throw new Error("MERCADOPAGO_ACCESS_TOKEN not configured");
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Parse body with error handling
+    rawBody = await req.text();
+    let body: MercadoPagoWebhook;
+    try {
+      body = JSON.parse(rawBody);
+    } catch {
+      await logWebhookEvent(supabase, {
+        event_type: "parse_error",
+        status: "error",
+        severity: "error",
+        payload: { raw: rawBody?.substring(0, 500) },
+        error_message: "Invalid JSON payload",
+        processing_time_ms: Date.now() - startTime,
+      });
+      return new Response(JSON.stringify({ received: true, error: "Invalid JSON" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    // Parse webhook payload
-    const body: MercadoPagoWebhook = await req.json();
-    console.log("Webhook received:", JSON.stringify(body, null, 2));
+    console.log("Webhook received:", body.type, body.action);
 
-    // Only process payment notifications
+    // Non-payment events → log as warning and skip
     if (body.type !== "payment") {
-      console.log("Ignoring non-payment notification:", body.type);
+      await logWebhookEvent(supabase, {
+        event_type: body.type,
+        event_action: body.action,
+        status: "skipped",
+        severity: "warning",
+        payload: body,
+        processing_time_ms: Date.now() - startTime,
+      });
       return new Response(JSON.stringify({ received: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const paymentId = body.data.id;
-    console.log("Processing payment:", paymentId);
 
-    // Fetch payment details from Mercado Pago
+    // Fetch payment from Mercado Pago
     const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     if (!mpResponse.ok) {
       const errorText = await mpResponse.text();
-      console.error("Error fetching payment from MP:", errorText);
+      await logWebhookEvent(supabase, {
+        event_type: "payment",
+        event_action: body.action,
+        external_payment_id: paymentId,
+        status: "error",
+        severity: "error",
+        payload: body,
+        response_data: { mp_status: mpResponse.status, mp_error: errorText.substring(0, 500) },
+        error_message: `MP API error ${mpResponse.status}`,
+        processing_time_ms: Date.now() - startTime,
+      });
+      await createAlert(supabase, "mp_api_error", "error",
+        "Erro na API do Mercado Pago",
+        `Falha ao buscar pagamento ${paymentId}: HTTP ${mpResponse.status}`,
+        { payment_id: paymentId, http_status: mpResponse.status }
+      );
       throw new Error(`Failed to fetch payment from Mercado Pago: ${errorText}`);
     }
 
     const mpPayment = await mpResponse.json();
-    console.log("Mercado Pago payment data:", JSON.stringify(mpPayment, null, 2));
-
     const externalReference = mpPayment.external_reference;
+
     if (!externalReference) {
-      console.log("No external reference found, skipping");
+      await logWebhookEvent(supabase, {
+        event_type: "payment",
+        event_action: body.action,
+        external_payment_id: paymentId,
+        status: "skipped",
+        severity: "warning",
+        error_message: "No external_reference found",
+        processing_time_ms: Date.now() - startTime,
+      });
       return new Response(JSON.stringify({ received: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Find payment in our database
+    // Find payment in database
     const { data: payment, error: fetchError } = await supabase
       .from("payments")
       .select("*")
@@ -83,38 +176,33 @@ serve(async (req) => {
       .single();
 
     if (fetchError || !payment) {
-      console.error("Payment not found in database:", externalReference, fetchError);
+      await logWebhookEvent(supabase, {
+        event_type: "payment",
+        event_action: body.action,
+        external_payment_id: paymentId,
+        external_reference: externalReference,
+        status: "error",
+        severity: "error",
+        error_message: `Payment not found in DB: ${fetchError?.message || "no record"}`,
+        processing_time_ms: Date.now() - startTime,
+      });
       return new Response(JSON.stringify({ received: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    console.log("Found payment in database:", payment.id);
-
-    // Map Mercado Pago status to our status
-    let status: string;
-    switch (mpPayment.status) {
-      case "approved":
-        status = "approved";
-        break;
-      case "pending":
-      case "in_process":
-      case "authorized":
-        status = "pending";
-        break;
-      case "rejected":
-        status = "rejected";
-        break;
-      case "cancelled":
-        status = "cancelled";
-        break;
-      case "refunded":
-      case "charged_back":
-        status = "refunded";
-        break;
-      default:
-        status = mpPayment.status;
-    }
+    // Map MP status
+    const statusMap: Record<string, string> = {
+      approved: "approved",
+      pending: "pending",
+      in_process: "pending",
+      authorized: "pending",
+      rejected: "rejected",
+      cancelled: "cancelled",
+      refunded: "refunded",
+      charged_back: "refunded",
+    };
+    const status = statusMap[mpPayment.status] || mpPayment.status;
 
     // Update payment record
     const updateData: Record<string, unknown> = {
@@ -122,7 +210,6 @@ serve(async (req) => {
       external_id: mpPayment.id.toString(),
       updated_at: new Date().toISOString(),
     };
-
     if (status === "approved") {
       updateData.paid_at = mpPayment.date_approved || new Date().toISOString();
     }
@@ -133,79 +220,168 @@ serve(async (req) => {
       .eq("id", payment.id);
 
     if (updateError) {
-      console.error("Error updating payment:", updateError);
+      await logWebhookEvent(supabase, {
+        event_type: "payment",
+        event_action: body.action,
+        external_payment_id: paymentId,
+        external_reference: externalReference,
+        payment_id: payment.id,
+        status: "error",
+        severity: "critical",
+        error_message: `DB update failed: ${updateError.message}`,
+        processing_time_ms: Date.now() - startTime,
+      });
+      await createAlert(supabase, "db_update_error", "critical",
+        "Falha ao atualizar pagamento",
+        `Pagamento ${payment.id} não pôde ser atualizado para status ${status}.`,
+        { payment_id: payment.id, external_id: paymentId }
+      );
       throw new Error("Failed to update payment record");
     }
 
-    console.log("Payment updated to status:", status);
-
-    // Process approved payments
-    if (status === "approved" && payment.status !== "approved") {
-      console.log("Processing approved payment...");
-      
-      const { data: processResult, error: processError } = await supabase.rpc(
-        "process_approved_payment",
-        { p_payment_id: payment.id }
+    // Handle rejected payments
+    if (status === "rejected") {
+      const reason = mpPayment.status_detail || "unknown";
+      await logWebhookEvent(supabase, {
+        event_type: "payment",
+        event_action: "payment.rejected",
+        external_payment_id: paymentId,
+        external_reference: externalReference,
+        payment_id: payment.id,
+        status: "processed",
+        severity: "warning",
+        response_data: { rejection_reason: reason, mp_status_detail: mpPayment.status_detail },
+        processing_time_ms: Date.now() - startTime,
+      });
+      return new Response(
+        JSON.stringify({ received: true, payment_id: payment.id, status }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-
-      if (processError) {
-        console.error("Error processing payment:", processError);
-      } else {
-        console.log("Payment processed successfully:", processResult);
-      }
     }
 
-    // Handle refunds - revert subscription/credits
+    // Process approved payments with retry
+    if (status === "approved" && payment.status !== "approved") {
+      let processSuccess = false;
+      let lastError: string | null = null;
+      const maxRetries = 3;
+
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        const { data: processResult, error: processError } = await supabase.rpc(
+          "process_approved_payment",
+          { p_payment_id: payment.id }
+        );
+
+        if (!processError && processResult) {
+          processSuccess = true;
+          break;
+        }
+
+        lastError = processError?.message || "process_approved_payment returned false";
+        console.error(`Attempt ${attempt}/${maxRetries} failed:`, lastError);
+
+        if (attempt < maxRetries) {
+          await new Promise((r) => setTimeout(r, 1000 * attempt));
+        }
+      }
+
+      if (!processSuccess) {
+        await logWebhookEvent(supabase, {
+          event_type: "payment",
+          event_action: "process_failed",
+          external_payment_id: paymentId,
+          external_reference: externalReference,
+          payment_id: payment.id,
+          status: "error",
+          severity: "critical",
+          error_message: `process_approved_payment failed after ${maxRetries} retries: ${lastError}`,
+          processing_time_ms: Date.now() - startTime,
+        });
+        await createAlert(supabase, "payment_process_failed", "critical",
+          "⚠️ Pagamento aprovado NÃO liberou plano",
+          `Pagamento ${payment.id} (R$${payment.amount}) aprovado mas process_approved_payment falhou após ${maxRetries} tentativas. Intervenção manual necessária.`,
+          { payment_id: payment.id, user_id: payment.user_id, amount: payment.amount, plan: payment.plan, error: lastError }
+        );
+      } else {
+        await logWebhookEvent(supabase, {
+          event_type: "payment",
+          event_action: "payment.approved",
+          external_payment_id: paymentId,
+          external_reference: externalReference,
+          payment_id: payment.id,
+          status: "processed",
+          severity: "info",
+          response_data: { plan: payment.plan, type: payment.type, amount: payment.amount },
+          processing_time_ms: Date.now() - startTime,
+        });
+      }
+    } else {
+      // Other status updates (pending, refunded, etc.)
+      await logWebhookEvent(supabase, {
+        event_type: "payment",
+        event_action: body.action,
+        external_payment_id: paymentId,
+        external_reference: externalReference,
+        payment_id: payment.id,
+        status: "processed",
+        severity: "info",
+        response_data: { new_status: status, old_status: payment.status },
+        processing_time_ms: Date.now() - startTime,
+      });
+    }
+
+    // Handle refunds
     if (status === "refunded" && payment.status !== "refunded") {
-      console.log("Processing refund...");
-      
       if (payment.type === "credits" && payment.credits_amount) {
-        // First get current extra_credits
-        const { data: currentSub, error: fetchSubError } = await supabase
+        const { data: currentSub } = await supabase
           .from("subscriptions")
           .select("extra_credits")
           .eq("user_id", payment.user_id)
           .single();
 
-        if (!fetchSubError && currentSub) {
+        if (currentSub) {
           const newCredits = Math.max(0, currentSub.extra_credits - payment.credits_amount);
-          const { error: refundError } = await supabase
+          await supabase
             .from("subscriptions")
-            .update({
-              extra_credits: newCredits,
-              updated_at: new Date().toISOString(),
-            })
+            .update({ extra_credits: newCredits, updated_at: new Date().toISOString() })
             .eq("user_id", payment.user_id);
-
-          if (refundError) {
-            console.error("Error processing refund:", refundError);
-          }
         }
       }
-      // For plan refunds, we might want to downgrade or cancel the subscription
-      // This depends on business rules
+
+      await createAlert(supabase, "payment_refunded", "warning",
+        "Pagamento reembolsado",
+        `Pagamento ${payment.id} de R$${payment.amount} foi reembolsado.`,
+        { payment_id: payment.id, user_id: payment.user_id, amount: payment.amount }
+      );
     }
 
     return new Response(
-      JSON.stringify({ 
-        received: true, 
-        payment_id: payment.id,
-        status 
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      JSON.stringify({ received: true, payment_id: payment.id, status }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
-    console.error("Webhook error:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    // Always return 200 to Mercado Pago to prevent retries on our errors
+    console.error("Webhook error:", errorMessage);
+
+    // Log critical unhandled error
+    try {
+      await logWebhookEvent(supabase, {
+        event_type: "unhandled_error",
+        status: "error",
+        severity: "critical",
+        payload: rawBody ? { raw: rawBody.substring(0, 1000) } : undefined,
+        error_message: errorMessage,
+        processing_time_ms: Date.now() - startTime,
+      });
+      await createAlert(supabase, "webhook_critical_error", "critical",
+        "Erro crítico no webhook",
+        `Erro não tratado no payment-webhook: ${errorMessage}`,
+        { error: errorMessage }
+      );
+    } catch { /* prevent infinite error loop */ }
+
     return new Response(
       JSON.stringify({ received: true, error: errorMessage }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
