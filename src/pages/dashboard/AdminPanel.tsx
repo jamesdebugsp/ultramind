@@ -15,6 +15,8 @@ import {
   Gift,
   Sparkles,
   RefreshCw,
+  Activity,
+  Bell,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -50,9 +52,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
+import { WebhookMonitoringPanel } from "@/components/dashboard/WebhookMonitoringPanel";
 import { useUserRoles } from "@/hooks/useUserRoles";
 import { useAdminData, AdminUser } from "@/hooks/useAdminData";
+import { useWebhookMonitoring } from "@/hooks/useWebhookMonitoring";
 
 export default function AdminPanel() {
   const navigate = useNavigate();
@@ -80,6 +85,7 @@ export default function AdminPanel() {
   });
   const [trialDays, setTrialDays] = useState(7);
   const [creditsAmount, setCreditsAmount] = useState(100);
+  const { unreadCount: alertCount } = useWebhookMonitoring();
 
   // Redirect if not super admin
   useEffect(() => {
@@ -293,6 +299,25 @@ export default function AdminPanel() {
           </div>
         </motion.div>
 
+        {/* Tabs for Users vs Monitoring */}
+        <Tabs defaultValue="users" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="users">
+              <Users className="w-4 h-4 mr-2" />
+              Usuários
+            </TabsTrigger>
+            <TabsTrigger value="monitoring" className="relative">
+              <Activity className="w-4 h-4 mr-2" />
+              Monitoramento
+              {alertCount > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-destructive rounded-full">
+                  {alertCount}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="users">
         {/* Stats */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -568,6 +593,12 @@ export default function AdminPanel() {
             </CardContent>
           </Card>
         </motion.div>
+          </TabsContent>
+
+          <TabsContent value="monitoring">
+            <WebhookMonitoringPanel />
+          </TabsContent>
+        </Tabs>
 
         {/* Trial Dialog */}
         <Dialog open={trialDialog.open} onOpenChange={(open) => setTrialDialog({ open, user: open ? trialDialog.user : null })}>

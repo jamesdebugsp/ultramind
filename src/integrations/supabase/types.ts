@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_alerts: {
+        Row: {
+          alert_type: string
+          created_at: string
+          description: string | null
+          id: string
+          is_read: boolean
+          metadata: Json | null
+          resolved_at: string | null
+          severity: string
+          title: string
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_read?: boolean
+          metadata?: Json | null
+          resolved_at?: string | null
+          severity?: string
+          title: string
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_read?: boolean
+          metadata?: Json | null
+          resolved_at?: string | null
+          severity?: string
+          title?: string
+        }
+        Relationships: []
+      }
       appointments: {
         Row: {
           calendar_event_id: string | null
@@ -597,6 +633,54 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      webhook_logs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          event_action: string | null
+          event_type: string
+          external_payment_id: string | null
+          external_reference: string | null
+          id: string
+          payload: Json | null
+          payment_id: string | null
+          processing_time_ms: number | null
+          response_data: Json | null
+          severity: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          event_action?: string | null
+          event_type: string
+          external_payment_id?: string | null
+          external_reference?: string | null
+          id?: string
+          payload?: Json | null
+          payment_id?: string | null
+          processing_time_ms?: number | null
+          response_data?: Json | null
+          severity?: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          event_action?: string | null
+          event_type?: string
+          external_payment_id?: string | null
+          external_reference?: string | null
+          id?: string
+          payload?: Json | null
+          payment_id?: string | null
+          processing_time_ms?: number | null
+          response_data?: Json | null
+          severity?: string
+          status?: string
         }
         Relationships: []
       }
