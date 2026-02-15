@@ -17,7 +17,7 @@ interface MercadoPagoWebhook {
   data: { id: string };
 }
 
-// Helper: create admin alert
+// Helper: create admin alert + send email for critical/error
 async function createAlert(
   supabase: ReturnType<typeof createClient>,
   alertType: string,
@@ -34,6 +34,24 @@ async function createAlert(
     metadata,
   });
   if (error) console.error("Failed to create alert:", error);
+
+  // Send email notification for critical and error alerts
+  if (severity === "critical" || severity === "error") {
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      await fetch(`${supabaseUrl}/functions/v1/send-admin-alert-email`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${serviceKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ alert_type: alertType, severity, title, description, metadata }),
+      });
+    } catch (emailErr) {
+      console.error("Failed to send alert email:", emailErr);
+    }
+  }
 }
 
 // Helper: log webhook event

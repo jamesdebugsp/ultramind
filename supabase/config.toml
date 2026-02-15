@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.whatsapp-bot]
 verify_jwt = false
+
+[functions.send-admin-alert-email]
+verify_jwt = false
