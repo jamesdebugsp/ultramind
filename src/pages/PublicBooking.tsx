@@ -212,7 +212,7 @@ export default function PublicBooking() {
 
         // Load settings
         const { data: settingsData, error: settingsError } = await supabase
-          .from("settings")
+          .from("public_booking_settings" as any)
           .select("working_hours_start, working_hours_end, appointment_interval, working_days")
           .eq("user_id", matchingProfile.user_id)
           .maybeSingle();
@@ -220,15 +220,16 @@ export default function PublicBooking() {
         if (settingsError) throw settingsError;
 
         if (settingsData) {
+          const s = settingsData as any;
           setSettings({
             working_hours_start:
-              settingsData.working_hours_start || DEFAULT_SETTINGS.working_hours_start,
+              s.working_hours_start || DEFAULT_SETTINGS.working_hours_start,
             working_hours_end:
-              settingsData.working_hours_end || DEFAULT_SETTINGS.working_hours_end,
+              s.working_hours_end || DEFAULT_SETTINGS.working_hours_end,
             appointment_interval:
-              settingsData.appointment_interval || DEFAULT_SETTINGS.appointment_interval,
-            working_days: Array.isArray(settingsData.working_days)
-              ? (settingsData.working_days as string[])
+              s.appointment_interval || DEFAULT_SETTINGS.appointment_interval,
+            working_days: Array.isArray(s.working_days)
+              ? (s.working_days as string[])
               : DEFAULT_SETTINGS.working_days,
           });
         } else {
