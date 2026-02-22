@@ -770,6 +770,30 @@ export type Database = {
         }
         Relationships: []
       }
+      public_booking_settings: {
+        Row: {
+          appointment_interval: number | null
+          user_id: string | null
+          working_days: Json | null
+          working_hours_end: string | null
+          working_hours_start: string | null
+        }
+        Insert: {
+          appointment_interval?: number | null
+          user_id?: string | null
+          working_days?: Json | null
+          working_hours_end?: string | null
+          working_hours_start?: string | null
+        }
+        Update: {
+          appointment_interval?: number | null
+          user_id?: string | null
+          working_days?: Json | null
+          working_hours_end?: string | null
+          working_hours_start?: string | null
+        }
+        Relationships: []
+      }
       public_business_info: {
         Row: {
           address: string | null
