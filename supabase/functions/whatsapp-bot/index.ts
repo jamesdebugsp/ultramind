@@ -667,8 +667,9 @@ _Digite *0* para voltar ao menu_`;
       case "awaiting_name": {
         const clientName = message.Body.trim();
 
-        if (clientName.length < 2) {
-          responseMessage = `❌ Por favor, informe seu nome completo.
+        // Validate name: only letters, spaces, hyphens, apostrophes (2-100 chars)
+        if (clientName.length < 2 || clientName.length > 100 || !/^[\p{L}\s'\-]+$/u.test(clientName)) {
+          responseMessage = `❌ Por favor, informe seu nome completo (apenas letras, sem números ou caracteres especiais).
 
 _Digite *0* para voltar ao menu_`;
         } else {
