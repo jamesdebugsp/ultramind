@@ -23,3 +23,12 @@ verify_jwt = false
 
 [functions.send-admin-alert-email]
 verify_jwt = false
+
+[functions.whatsapp-business-connect]
+verify_jwt = false
+
+[functions.whatsapp-business-send]
+verify_jwt = false
+
+[functions.whatsapp-business-webhook]
+verify_jwt = false

@@ -250,6 +250,48 @@ export type Database = {
         }
         Relationships: []
       }
+      companies_whatsapp_config: {
+        Row: {
+          access_token: string
+          business_account_id: string
+          business_name: string | null
+          created_at: string
+          id: string
+          is_verified: boolean
+          phone_display: string | null
+          phone_number_id: string
+          updated_at: string
+          user_id: string
+          verified_at: string | null
+        }
+        Insert: {
+          access_token: string
+          business_account_id: string
+          business_name?: string | null
+          created_at?: string
+          id?: string
+          is_verified?: boolean
+          phone_display?: string | null
+          phone_number_id: string
+          updated_at?: string
+          user_id: string
+          verified_at?: string | null
+        }
+        Update: {
+          access_token?: string
+          business_account_id?: string
+          business_name?: string | null
+          created_at?: string
+          id?: string
+          is_verified?: boolean
+          phone_display?: string | null
+          phone_number_id?: string
+          updated_at?: string
+          user_id?: string
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
@@ -681,6 +723,63 @@ export type Database = {
           response_data?: Json | null
           severity?: string
           status?: string
+        }
+        Relationships: []
+      }
+      whatsapp_business_messages: {
+        Row: {
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          id: string
+          max_retries: number
+          message_id: string | null
+          metadata: Json | null
+          next_retry_at: string | null
+          recipient_number: string
+          retry_count: number
+          status: string
+          status_updated_at: string | null
+          template_name: string
+          template_params: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          max_retries?: number
+          message_id?: string | null
+          metadata?: Json | null
+          next_retry_at?: string | null
+          recipient_number: string
+          retry_count?: number
+          status?: string
+          status_updated_at?: string | null
+          template_name: string
+          template_params?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          max_retries?: number
+          message_id?: string | null
+          metadata?: Json | null
+          next_retry_at?: string | null
+          recipient_number?: string
+          retry_count?: number
+          status?: string
+          status_updated_at?: string | null
+          template_name?: string
+          template_params?: Json | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
