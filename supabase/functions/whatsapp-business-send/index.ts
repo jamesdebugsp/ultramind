@@ -8,6 +8,7 @@ const corsHeaders = {
 
 const META_API_VERSION = "v18.0";
 const MAX_MESSAGES_PER_MINUTE = 30;
+const RETRY_DELAYS = [5000, 15000, 30000]; // 5s, 15s, 30s
 
 // Simple in-memory rate limiter per user
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -24,6 +25,59 @@ function checkRateLimit(userId: string): boolean {
   }
   entry.count++;
   return true;
+}
+
+async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function sendWithRetry(
+  url: string,
+  headers: Record<string, string>,
+  body: any,
+  maxRetries: number = 3
+): Promise<{ response: Response; data: any; retryCount: number }> {
+  let lastError: any;
+  let retryCount = 0;
+
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      const data = await response.json();
+
+      // If success or permanent error, return
+      if (response.ok || (response.status < 500 && response.status !== 429)) {
+        return { response, data, retryCount };
+      }
+
+      // Retryable error
+      lastError = data;
+      retryCount = i + 1;
+
+      if (i < maxRetries) {
+        const delay = RETRY_DELAYS[i] || 30000;
+        console.log(`Retry ${i + 1}/${maxRetries} after ${delay}ms...`);
+        await sleep(delay);
+      }
+    } catch (err) {
+      lastError = err;
+      retryCount = i + 1;
+      if (i < maxRetries) {
+        await sleep(RETRY_DELAYS[i] || 30000);
+      }
+    }
+  }
+
+  return {
+    response: new Response(JSON.stringify({ error: lastError }), { status: 500 }),
+    data: { error: lastError },
+    retryCount,
+  };
 }
 
 Deno.serve(async (req) => {
@@ -59,7 +113,7 @@ Deno.serve(async (req) => {
     // Rate limit check
     if (!checkRateLimit(userId)) {
       return new Response(
-        JSON.stringify({ error: "Rate limit excedido. Aguarde 1 minuto." }),
+        JSON.stringify({ error: "Rate limit excedido. Máximo de 30 mensagens por minuto." }),
         { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -75,7 +129,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Sanitize phone number
     const cleanPhone = to.replace(/[^0-9]/g, "");
     if (cleanPhone.length < 10 || cleanPhone.length > 15) {
       return new Response(
@@ -91,12 +144,46 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch company credentials
     const serviceClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // Check monthly limit
+    const { data: canSend, error: limitError } = await serviceClient.rpc(
+      "check_and_consume_wa_limit",
+      { p_user_id: userId }
+    );
+
+    if (limitError) {
+      console.error("Error checking limit:", limitError);
+      return new Response(
+        JSON.stringify({ error: "Erro ao verificar limite mensal" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!canSend) {
+      // Get plan info for error message
+      const { data: plan } = await serviceClient
+        .from("company_whatsapp_plans")
+        .select("plan_type, monthly_limit, messages_sent_current_month")
+        .eq("user_id", userId)
+        .single();
+
+      return new Response(
+        JSON.stringify({
+          error: "Limite mensal de mensagens atingido",
+          plan_type: plan?.plan_type || "basic",
+          monthly_limit: plan?.monthly_limit || 1000,
+          messages_sent: plan?.messages_sent_current_month || 0,
+          upgrade_message: "Faça upgrade do seu plano para enviar mais mensagens.",
+        }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Fetch company credentials
     const { data: config, error: configError } = await serviceClient
       .from("companies_whatsapp_config")
       .select("*")
@@ -140,7 +227,10 @@ Deno.serve(async (req) => {
       console.error("Error creating message record:", msgError);
     }
 
-    // Send via Meta API
+    // Minimum 1 second delay between sends (rate limiting)
+    await sleep(1000);
+
+    // Send via Meta API with retry
     console.log(`Sending template '${template_name}' to ${cleanPhone}`);
     const metaPayload = {
       messaging_product: "whatsapp",
@@ -153,24 +243,19 @@ Deno.serve(async (req) => {
       },
     };
 
-    const metaResponse = await fetch(
+    const { response: metaResponse, data: metaResult, retryCount } = await sendWithRetry(
       `https://graph.facebook.com/${META_API_VERSION}/${config.phone_number_id}/messages`,
       {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${config.access_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(metaPayload),
-      }
+        Authorization: `Bearer ${config.access_token}`,
+        "Content-Type": "application/json",
+      },
+      metaPayload,
+      3
     );
 
-    const metaResult = await metaResponse.json();
-
     if (!metaResponse.ok) {
-      console.error("Meta API error:", metaResult);
+      console.error("Meta API error after retries:", metaResult);
 
-      // Update message status to failed
       if (messageRecord) {
         await serviceClient
           .from("whatsapp_business_messages")
@@ -179,35 +264,22 @@ Deno.serve(async (req) => {
             error_code: metaResult?.error?.code?.toString() || "unknown",
             error_message: metaResult?.error?.message || "Erro desconhecido",
             status_updated_at: new Date().toISOString(),
-          })
-          .eq("id", messageRecord.id);
-      }
-
-      // Check if retryable (rate limit or temporary server error)
-      const isRetryable = metaResponse.status === 429 || metaResponse.status >= 500;
-      if (isRetryable && messageRecord && messageRecord.retry_count < messageRecord.max_retries) {
-        const nextRetry = new Date(Date.now() + (messageRecord.retry_count + 1) * 30000);
-        await serviceClient
-          .from("whatsapp_business_messages")
-          .update({
-            status: "retry_scheduled",
-            retry_count: messageRecord.retry_count + 1,
-            next_retry_at: nextRetry.toISOString(),
+            retry_count: retryCount,
           })
           .eq("id", messageRecord.id);
       }
 
       return new Response(
         JSON.stringify({
-          error: "Falha ao enviar mensagem",
+          error: "Falha ao enviar mensagem após tentativas",
           details: metaResult?.error?.message,
-          retryable: isRetryable,
+          retry_count: retryCount,
         }),
-        { status: metaResponse.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: metaResponse.status >= 400 ? metaResponse.status : 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Update message with success
+    // Success
     const whatsappMessageId = metaResult?.messages?.[0]?.id;
     if (messageRecord) {
       await serviceClient
@@ -216,17 +288,19 @@ Deno.serve(async (req) => {
           message_id: whatsappMessageId || null,
           status: "sent",
           status_updated_at: new Date().toISOString(),
+          retry_count: retryCount,
         })
         .eq("id", messageRecord.id);
     }
 
-    console.log("Message sent successfully:", whatsappMessageId);
+    console.log("Message sent successfully:", whatsappMessageId, `(${retryCount} retries)`);
 
     return new Response(
       JSON.stringify({
         success: true,
         message_id: whatsappMessageId,
         status: "sent",
+        retry_count: retryCount,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

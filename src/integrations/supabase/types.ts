@@ -292,6 +292,39 @@ export type Database = {
         }
         Relationships: []
       }
+      company_whatsapp_plans: {
+        Row: {
+          created_at: string
+          id: string
+          messages_sent_current_month: number
+          monthly_limit: number
+          plan_type: string
+          reset_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          messages_sent_current_month?: number
+          monthly_limit?: number
+          plan_type?: string
+          reset_date?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          messages_sent_current_month?: number
+          monthly_limit?: number
+          plan_type?: string
+          reset_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
@@ -936,6 +969,10 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: boolean
       }
+      check_and_consume_wa_limit: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
       clean_expired_conversations: { Args: never; Returns: number }
       consume_credit: {
         Args: { p_amount?: number; p_user_id: string }
@@ -998,6 +1035,7 @@ export type Database = {
         Returns: boolean
       }
       reset_monthly_credits: { Args: { p_user_id: string }; Returns: undefined }
+      reset_wa_monthly_counters: { Args: never; Returns: number }
     }
     Enums: {
       app_role: "super_admin" | "admin" | "user"

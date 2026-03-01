@@ -28,6 +28,7 @@ import Planos from "./pages/dashboard/Planos";
 import OwnerDashboard from "./pages/dashboard/OwnerDashboard";
 import MonitoramentoWhatsApp from "./pages/dashboard/MonitoramentoWhatsApp";
 import IntegracaoWhatsApp from "./pages/dashboard/IntegracaoWhatsApp";
+import WhatsAppLogs from "./pages/dashboard/WhatsAppLogs";
 
 const queryClient = new QueryClient();
 
@@ -156,6 +157,14 @@ const App = () => (
                 element={
                   <PrivateRoute>
                     <IntegracaoWhatsApp />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/dashboard/whatsapp-logs"
+                element={
+                  <PrivateRoute>
+                    <WhatsAppLogs />
                   </PrivateRoute>
                 }
               />

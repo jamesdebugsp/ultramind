@@ -12,33 +12,47 @@ import {
   Trash2,
   RefreshCw,
   Shield,
+  TestTube,
+  BarChart3,
+  ArrowRight,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useWhatsAppBusiness } from "@/hooks/useWhatsAppBusiness";
 import { Spinner } from "@/components/ui/spinner";
+import { useNavigate } from "react-router-dom";
 
 export default function IntegracaoWhatsApp() {
   const {
     config,
     messages,
+    plan,
     stats,
     loading,
     connecting,
     connectWhatsApp,
     disconnectWhatsApp,
+    sendTemplate,
     refetch,
   } = useWhatsAppBusiness();
+  const navigate = useNavigate();
 
   const [phoneNumberId, setPhoneNumberId] = useState("");
   const [accessToken, setAccessToken] = useState("");
   const [businessAccountId, setBusinessAccountId] = useState("");
   const [showToken, setShowToken] = useState(false);
+
+  // Test send state
+  const [testTo, setTestTo] = useState("");
+  const [testTemplate, setTestTemplate] = useState("hello_world");
+  const [testSending, setTestSending] = useState(false);
+  const [testDialogOpen, setTestDialogOpen] = useState(false);
 
   const handleConnect = async () => {
     if (!phoneNumberId.trim() || !accessToken.trim() || !businessAccountId.trim()) return;
@@ -48,6 +62,14 @@ export default function IntegracaoWhatsApp() {
       setAccessToken("");
       setBusinessAccountId("");
     }
+  };
+
+  const handleTestSend = async () => {
+    if (!testTo.trim() || !testTemplate.trim()) return;
+    setTestSending(true);
+    await sendTemplate(testTo.trim(), testTemplate.trim());
+    setTestSending(false);
+    setTestDialogOpen(false);
   };
 
   if (loading) {
@@ -60,6 +82,18 @@ export default function IntegracaoWhatsApp() {
     );
   }
 
+  const planLabels: Record<string, string> = {
+    basic: "Basic — 1.000/mês",
+    pro: "Pro — 5.000/mês",
+    business: "Business — Ilimitado",
+  };
+
+  const usagePercent = plan
+    ? plan.monthly_limit === -1
+      ? 0
+      : Math.min(100, (plan.messages_sent_current_month / plan.monthly_limit) * 100)
+    : 0;
+
   const statusIcon = (status: string) => {
     switch (status) {
       case "sent":
@@ -70,7 +104,7 @@ export default function IntegracaoWhatsApp() {
       case "read":
         return <Eye className="w-4 h-4 text-emerald-500" />;
       case "failed":
-        return <XCircle className="w-4 h-4 text-red-500" />;
+        return <XCircle className="w-4 h-4 text-destructive" />;
       default:
         return <Clock className="w-4 h-4 text-yellow-500" />;
     }
@@ -78,16 +112,14 @@ export default function IntegracaoWhatsApp() {
 
   const statusLabel = (status: string) => {
     const map: Record<string, string> = {
-      pending: "Pendente",
-      sending: "Enviando",
-      sent: "Enviado",
-      delivered: "Entregue",
-      read: "Lido",
-      failed: "Falhou",
-      retry_scheduled: "Retry agendado",
+      pending: "Pendente", sending: "Enviando", sent: "Enviado",
+      delivered: "Entregue", read: "Lido", failed: "Falhou",
+      retry_scheduled: "Retry",
     };
     return map[status] || status;
   };
+
+  const lastMessage = messages[0];
 
   return (
     <DashboardLayout>
@@ -106,18 +138,22 @@ export default function IntegracaoWhatsApp() {
               Conecte sua conta do WhatsApp Business Cloud API (Meta)
             </p>
           </div>
-          <Button variant="outline" onClick={() => refetch()}>
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Atualizar
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => refetch()}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Atualizar
+            </Button>
+            {config?.is_verified && (
+              <Button variant="outline" onClick={() => navigate("/dashboard/whatsapp-logs")}>
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Logs
+              </Button>
+            )}
+          </div>
         </motion.div>
 
-        {/* Connection Status */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
+        {/* Connection Card */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
           <Card variant="elevated">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -133,7 +169,7 @@ export default function IntegracaoWhatsApp() {
               {config?.is_verified ? (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
-                    <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20">
+                    <Badge className="bg-green-500/10 text-green-600 border-green-500/20">
                       ✅ Conectado
                     </Badge>
                     {config.verified_at && (
@@ -156,10 +192,52 @@ export default function IntegracaoWhatsApp() {
                       <p className="font-mono text-sm">{config.business_account_id}</p>
                     </div>
                   </div>
-                  <Button variant="destructive" size="sm" onClick={disconnectWhatsApp}>
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Desconectar
-                  </Button>
+                  <div className="flex gap-2">
+                    <Dialog open={testDialogOpen} onOpenChange={setTestDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <TestTube className="w-4 h-4 mr-2" />
+                          Testar Envio
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Testar Envio de Template</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label>Número (com DDI)</Label>
+                            <Input
+                              placeholder="5511999999999"
+                              value={testTo}
+                              onChange={(e) => setTestTo(e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <Label>Nome do Template</Label>
+                            <Input
+                              placeholder="hello_world"
+                              value={testTemplate}
+                              onChange={(e) => setTestTemplate(e.target.value)}
+                            />
+                          </div>
+                          <Button
+                            variant="hero"
+                            onClick={handleTestSend}
+                            disabled={testSending || !testTo || !testTemplate}
+                            className="w-full"
+                          >
+                            {testSending ? <Spinner className="w-4 h-4 mr-2" /> : <Send className="w-4 h-4 mr-2" />}
+                            Enviar Teste
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                    <Button variant="destructive" size="sm" onClick={disconnectWhatsApp}>
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Desconectar
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -172,12 +250,11 @@ export default function IntegracaoWhatsApp() {
                           <li>Acesse <strong>developers.facebook.com</strong></li>
                           <li>Crie ou selecione seu app com WhatsApp Business</li>
                           <li>Vá em WhatsApp {">"} API Setup</li>
-                          <li>Copie o Phone Number ID, Access Token e Business Account ID</li>
+                          <li>Copie Phone Number ID, Access Token e Business Account ID</li>
                         </ol>
                       </div>
                     </div>
                   </div>
-
                   <div className="grid gap-4">
                     <div>
                       <Label htmlFor="phone_id">Phone Number ID</Label>
@@ -199,12 +276,7 @@ export default function IntegracaoWhatsApp() {
                           value={accessToken}
                           onChange={(e) => setAccessToken(e.target.value)}
                         />
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => setShowToken(!showToken)}
-                          type="button"
-                        >
+                        <Button variant="outline" size="icon" onClick={() => setShowToken(!showToken)}>
                           <Eye className="w-4 h-4" />
                         </Button>
                       </div>
@@ -220,22 +292,15 @@ export default function IntegracaoWhatsApp() {
                       />
                     </div>
                   </div>
-
                   <Button
                     variant="hero"
                     onClick={handleConnect}
                     disabled={connecting || !phoneNumberId || !accessToken || !businessAccountId}
                   >
                     {connecting ? (
-                      <>
-                        <Spinner className="w-4 h-4 mr-2" />
-                        Validando...
-                      </>
+                      <><Spinner className="w-4 h-4 mr-2" />Validando...</>
                     ) : (
-                      <>
-                        <Wifi className="w-4 h-4 mr-2" />
-                        Conectar WhatsApp
-                      </>
+                      <><Wifi className="w-4 h-4 mr-2" />Conectar WhatsApp</>
                     )}
                   </Button>
                 </div>
@@ -244,7 +309,40 @@ export default function IntegracaoWhatsApp() {
           </Card>
         </motion.div>
 
-        {/* Stats */}
+        {/* Plan & Usage */}
+        {config?.is_verified && plan && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+            <Card variant="elevated">
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Plano & Uso Mensal</span>
+                  <Badge variant="outline">{planLabels[plan.plan_type] || plan.plan_type}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    {plan.messages_sent_current_month} de{" "}
+                    {plan.monthly_limit === -1 ? "∞" : plan.monthly_limit.toLocaleString()} mensagens
+                  </span>
+                  <span className="text-muted-foreground">
+                    Reset em: {new Date(plan.reset_date).toLocaleDateString("pt-BR")}
+                  </span>
+                </div>
+                {plan.monthly_limit !== -1 && (
+                  <Progress value={usagePercent} className="h-3" />
+                )}
+                {usagePercent >= 80 && plan.monthly_limit !== -1 && (
+                  <p className="text-sm text-destructive">
+                    ⚠️ Você está usando {Math.round(usagePercent)}% do limite mensal.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {/* Stats Grid */}
         {config?.is_verified && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -253,15 +351,15 @@ export default function IntegracaoWhatsApp() {
             className="grid grid-cols-2 md:grid-cols-5 gap-4"
           >
             {[
-              { label: "Total", value: stats.total, icon: MessageSquare, color: "text-foreground" },
-              { label: "Enviadas", value: stats.sent, icon: Send, color: "text-blue-500" },
-              { label: "Entregues", value: stats.delivered, icon: CheckCircle2, color: "text-green-500" },
-              { label: "Lidas", value: stats.read, icon: Eye, color: "text-emerald-500" },
-              { label: "Falhas", value: stats.failed, icon: XCircle, color: "text-red-500" },
+              { label: "Total", value: stats.total, icon: MessageSquare },
+              { label: "Enviadas", value: stats.sent, icon: Send },
+              { label: "Entregues", value: stats.delivered, icon: CheckCircle2 },
+              { label: "Lidas", value: stats.read, icon: Eye },
+              { label: "Falhas", value: stats.failed, icon: XCircle },
             ].map((stat) => (
               <Card key={stat.label} variant="elevated" className="p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <stat.icon className={`w-4 h-4 ${stat.color}`} />
+                  <stat.icon className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">{stat.label}</span>
                 </div>
                 <p className="text-2xl font-bold">{stat.value}</p>
@@ -270,44 +368,71 @@ export default function IntegracaoWhatsApp() {
           </motion.div>
         )}
 
-        {/* Messages History */}
-        {config?.is_verified && messages.length > 0 && (
+        {/* Last Message + Recent Messages */}
+        {config?.is_verified && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
+            transition={{ delay: 0.25 }}
+            className="grid grid-cols-1 lg:grid-cols-3 gap-6"
           >
+            {/* Last message */}
             <Card variant="elevated">
               <CardHeader>
-                <CardTitle>Histórico de Mensagens</CardTitle>
+                <CardTitle className="text-base">Última Mensagem</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {messages.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className="flex items-center justify-between p-3 bg-muted/20 rounded-lg"
-                    >
-                      <div className="flex items-center gap-3">
-                        {statusIcon(msg.status)}
-                        <div>
-                          <p className="text-sm font-medium">{msg.template_name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Para: {msg.recipient_number}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <Badge variant="outline" className="text-xs">
-                          {statusLabel(msg.status)}
-                        </Badge>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {new Date(msg.created_at).toLocaleString("pt-BR")}
-                        </p>
-                      </div>
+                {lastMessage ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      {statusIcon(lastMessage.status)}
+                      <Badge variant="outline">{statusLabel(lastMessage.status)}</Badge>
                     </div>
-                  ))}
-                </div>
+                    <p className="text-sm"><strong>Template:</strong> {lastMessage.template_name}</p>
+                    <p className="text-sm"><strong>Para:</strong> {lastMessage.recipient_number}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(lastMessage.created_at).toLocaleString("pt-BR")}
+                    </p>
+                    {lastMessage.error_message && (
+                      <p className="text-xs text-destructive">{lastMessage.error_message}</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Nenhuma mensagem enviada ainda.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Recent messages */}
+            <Card variant="elevated" className="lg:col-span-2">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="text-base">Mensagens Recentes</CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard/whatsapp-logs")}>
+                  Ver todos <ArrowRight className="w-4 h-4 ml-1" />
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {messages.length > 0 ? (
+                  <div className="space-y-2">
+                    {messages.slice(0, 5).map((msg) => (
+                      <div
+                        key={msg.id}
+                        className="flex items-center justify-between p-2 rounded-lg bg-muted/20"
+                      >
+                        <div className="flex items-center gap-2">
+                          {statusIcon(msg.status)}
+                          <span className="text-sm">{msg.template_name}</span>
+                          <span className="text-xs text-muted-foreground">→ {msg.recipient_number}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(msg.created_at).toLocaleString("pt-BR")}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Nenhuma mensagem ainda.</p>
+                )}
               </CardContent>
             </Card>
           </motion.div>
