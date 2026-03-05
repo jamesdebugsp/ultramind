@@ -29,6 +29,7 @@ import OwnerDashboard from "./pages/dashboard/OwnerDashboard";
 import MonitoramentoWhatsApp from "./pages/dashboard/MonitoramentoWhatsApp";
 import IntegracaoWhatsApp from "./pages/dashboard/IntegracaoWhatsApp";
 import WhatsAppLogs from "./pages/dashboard/WhatsAppLogs";
+import IAAgenda from "./pages/dashboard/IAAgenda";
 
 const queryClient = new QueryClient();
 
@@ -165,6 +166,14 @@ const App = () => (
                 element={
                   <PrivateRoute>
                     <WhatsAppLogs />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/dashboard/ia-agenda"
+                element={
+                  <PrivateRoute>
+                    <IAAgenda />
                   </PrivateRoute>
                 }
               />

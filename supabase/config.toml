@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.whatsapp-monthly-reset]
 verify_jwt = false
+
+[functions.agenda-insights]
+verify_jwt = false
