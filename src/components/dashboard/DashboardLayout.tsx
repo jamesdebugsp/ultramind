@@ -16,7 +16,8 @@ import {
   Scissors,
   Crown,
   Shield,
-  Activity
+  Activity,
+  Brain
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -31,6 +32,7 @@ const mainLinks = [
   { icon: Scissors, label: "Serviços", href: "/dashboard/servicos" },
   { icon: Clock, label: "Horários", href: "/dashboard/horarios" },
   { icon: MessageSquare, label: "Bot WhatsApp", href: "/dashboard/bot" },
+  { icon: Brain, label: "IA da Agenda", href: "/dashboard/ia-agenda" },
   { icon: BarChart3, label: "Relatórios", href: "/dashboard/relatorios" },
   { icon: QrCode, label: "Minha Página", href: "/dashboard/pagina" },
   { icon: Crown, label: "Planos", href: "/dashboard/planos" },
