@@ -40,12 +40,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
+      console.log("[Auth] Tentando login para:", email);
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
+      if (error) {
+        console.error("[Auth] Erro no login:", error.message);
+      } else {
+        console.log("[Auth] Login bem-sucedido para:", email);
+      }
       return { error: (error as Error | null) ?? null };
     } catch (err: any) {
+      console.error("[Auth] Erro de rede no login:", err);
       return {
         error:
           err instanceof Error
@@ -63,7 +70,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const redirectUrl = `${window.location.origin}/`;
 
     try {
-      const { error } = await supabase.auth.signUp({
+      console.log("[Auth] Tentando signup para:", email);
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -71,8 +79,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           data: metadata,
         },
       });
-      return { error: (error as Error | null) ?? null };
+      
+      if (error) {
+        console.error("[Auth] Erro no signUp:", error.message);
+        return { error: error as Error };
+      }
+
+      // Check if user was created but needs email confirmation
+      if (data?.user && !data?.session) {
+        console.warn("[Auth] Usuário criado mas sem sessão - pode precisar confirmar email");
+      }
+      
+      if (data?.user && data?.session) {
+        console.log("[Auth] Signup completo com sessão ativa, user_id:", data.user.id);
+      }
+
+      return { error: null };
     } catch (err: any) {
+      console.error("[Auth] Erro de rede no signUp:", err);
       return {
         error:
           err instanceof Error
