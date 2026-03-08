@@ -37,57 +37,74 @@ export default function Cadastro() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validações
+    if (!formData.name.trim()) {
+      toast({ title: "Erro", description: "Preencha seu nome", variant: "destructive" });
+      return;
+    }
+
+    if (!formData.email.trim()) {
+      toast({ title: "Erro", description: "Preencha seu email", variant: "destructive" });
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
-      toast({
-        title: "Erro",
-        description: "As senhas não coincidem",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "As senhas não coincidem", variant: "destructive" });
       return;
     }
 
     if (formData.password.length < 6) {
-      toast({
-        title: "Erro",
-        description: "A senha deve ter pelo menos 6 caracteres",
-        variant: "destructive",
-      });
+      toast({ title: "Erro", description: "A senha deve ter pelo menos 6 caracteres", variant: "destructive" });
       return;
     }
 
     setIsLoading(true);
+    console.log("[Cadastro] Iniciando signup para:", formData.email);
 
-    const { error } = await signUp(formData.email, formData.password, {
-      name: formData.name,
-      phone: formData.phone,
-    });
+    try {
+      const { error } = await signUp(formData.email, formData.password, {
+        name: formData.name,
+        phone: formData.phone,
+      });
 
-    if (error) {
-      setIsLoading(false);
-      let errorMessage = "Erro ao criar conta. Tente novamente.";
-      
-      if (error.message.includes("User already registered")) {
-        errorMessage = "Este email já está cadastrado. Tente fazer login.";
-      } else if (error.message.includes("Password")) {
-        errorMessage = "A senha deve ter pelo menos 6 caracteres.";
-      } else if (error.message.includes("Invalid email")) {
-        errorMessage = "Por favor, insira um email válido.";
+      if (error) {
+        console.error("[Cadastro] Erro no signup:", error.message);
+        let errorMessage = "Erro ao criar conta. Tente novamente.";
+        
+        if (error.message.includes("User already registered")) {
+          errorMessage = "Este email já está cadastrado. Tente fazer login.";
+        } else if (error.message.includes("Password")) {
+          errorMessage = "A senha deve ter pelo menos 6 caracteres.";
+        } else if (error.message.includes("Invalid email")) {
+          errorMessage = "Por favor, insira um email válido.";
+        } else if (error.message.includes("Signup is disabled")) {
+          errorMessage = "Cadastro temporariamente desabilitado. Tente novamente mais tarde.";
+        } else if (error.message.includes("rate limit") || error.message.includes("429")) {
+          errorMessage = "Muitas tentativas. Aguarde alguns minutos e tente novamente.";
+        } else if (error.message.includes("network") || error.message.includes("fetch")) {
+          errorMessage = "Erro de conexão. Verifique sua internet e tente novamente.";
+        }
+        
+        toast({ title: "Erro no cadastro", description: errorMessage, variant: "destructive" });
+        return;
       }
-      
+
+      console.log("[Cadastro] Signup bem-sucedido para:", formData.email);
       toast({
-        title: "Erro no cadastro",
-        description: errorMessage,
+        title: "Conta criada com sucesso! 🎉",
+        description: "Vamos configurar seu estabelecimento...",
+      });
+      navigate("/onboarding");
+    } catch (err: any) {
+      console.error("[Cadastro] Erro inesperado:", err);
+      toast({
+        title: "Erro inesperado",
+        description: "Falha ao criar conta. Verifique sua conexão e tente novamente.",
         variant: "destructive",
       });
-      return;
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
-    toast({
-      title: "Conta criada com sucesso!",
-      description: "Vamos configurar seu estabelecimento...",
-    });
-    navigate("/onboarding");
   };
 
   // Show nothing while checking auth state
