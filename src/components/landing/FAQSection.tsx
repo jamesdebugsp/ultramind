@@ -43,16 +43,17 @@ const faqs = [
 
 export function FAQSection() {
   return (
-    <section id="faq" className="py-24 bg-background">
+    <section id="faq" className="py-28 bg-background">
       <div className="container px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-16"
+          className="text-center mb-20"
         >
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+          <p className="text-sm font-semibold text-secondary uppercase tracking-widest mb-3">FAQ</p>
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-foreground mb-5">
             Perguntas Frequentes
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -72,12 +73,12 @@ export function FAQSection() {
               <AccordionItem
                 key={index}
                 value={`item-${index}`}
-                className="bg-card border border-border rounded-xl px-6 data-[state=open]:shadow-card transition-shadow"
+                className="bg-card border border-border rounded-2xl px-6 data-[state=open]:shadow-lg transition-all duration-300"
               >
-                <AccordionTrigger className="text-left font-semibold text-foreground hover:text-highlight py-5">
+                <AccordionTrigger className="text-left font-semibold text-foreground hover:text-secondary py-5">
                   {faq.question}
                 </AccordionTrigger>
-                <AccordionContent className="text-muted-foreground pb-5">
+                <AccordionContent className="text-muted-foreground pb-5 leading-relaxed">
                   {faq.answer}
                 </AccordionContent>
               </AccordionItem>

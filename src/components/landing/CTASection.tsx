@@ -7,11 +7,11 @@ import { useAuth } from "@/contexts/AuthContext";
 export function CTASection() {
   const { user } = useAuth();
   return (
-    <section className="py-24 gradient-primary relative overflow-hidden">
+    <section className="py-28 gradient-primary relative overflow-hidden">
       {/* Decorative elements */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-highlight/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-accent/10 rounded-full blur-3xl" />
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-secondary/15 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-highlight/10 rounded-full blur-3xl" />
       </div>
 
       <div className="container px-4 relative z-10">
@@ -22,17 +22,17 @@ export function CTASection() {
           transition={{ duration: 0.6 }}
           className="max-w-3xl mx-auto text-center"
         >
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-primary-foreground mb-6">
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-primary-foreground mb-6 leading-tight">
             Pronto para transformar seus agendamentos?
           </h2>
-          <p className="text-lg text-primary-foreground/80 mb-8 max-w-xl mx-auto">
+          <p className="text-lg text-primary-foreground/80 mb-10 max-w-xl mx-auto">
             Junte-se a mais de 2.500 negócios que já automatizaram sua gestão com o AgendePro
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button variant="highlight" size="xl" asChild>
+            <Button variant="highlight" size="xl" className="shadow-cta" asChild>
               <Link to={user ? "/dashboard/planos" : "/cadastro"}>
-                Começar Grátis — 7 dias
+                Começar agora grátis
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Link>
             </Button>
@@ -52,6 +52,10 @@ export function CTASection() {
               </a>
             </Button>
           </div>
+
+          <p className="mt-6 text-sm text-primary-foreground/60">
+            Sem cartão de crédito · Cancele quando quiser
+          </p>
         </motion.div>
       </div>
     </section>

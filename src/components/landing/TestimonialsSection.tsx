@@ -35,16 +35,17 @@ const testimonials = [
 
 export function TestimonialsSection() {
   return (
-    <section id="depoimentos" className="py-24 bg-muted/30">
+    <section id="depoimentos" className="py-28 bg-card">
       <div className="container px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-16"
+          className="text-center mb-20"
         >
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+          <p className="text-sm font-semibold text-secondary uppercase tracking-widest mb-3">Depoimentos</p>
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-foreground mb-5">
             O que nossos clientes dizem
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -61,9 +62,9 @@ export function TestimonialsSection() {
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
             >
-              <Card variant="elevated" className="h-full p-6">
+              <Card variant="elevated" className="h-full p-7 rounded-2xl hover:-translate-y-1 transition-all duration-300">
                 {/* Quote icon */}
-                <Quote className="w-8 h-8 text-highlight/30 mb-4" />
+                <Quote className="w-8 h-8 text-secondary/20 mb-4" />
 
                 {/* Content */}
                 <p className="text-foreground mb-6 leading-relaxed">
@@ -71,7 +72,7 @@ export function TestimonialsSection() {
                 </p>
 
                 {/* Rating */}
-                <div className="flex gap-1 mb-4">
+                <div className="flex gap-0.5 mb-5">
                   {Array.from({ length: testimonial.rating }).map((_, i) => (
                     <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
                   ))}
@@ -79,7 +80,7 @@ export function TestimonialsSection() {
 
                 {/* Author */}
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full gradient-accent flex items-center justify-center text-primary-foreground text-sm font-bold">
+                  <div className="w-10 h-10 rounded-full gradient-primary flex items-center justify-center text-primary-foreground text-sm font-bold">
                     {testimonial.avatar}
                   </div>
                   <div>
@@ -98,7 +99,7 @@ export function TestimonialsSection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.4 }}
-          className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto"
+          className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto"
         >
           {[
             { value: "2.500+", label: "Negócios ativos" },
@@ -107,10 +108,10 @@ export function TestimonialsSection() {
             { value: "80%", label: "Redução de faltas" },
           ].map((stat) => (
             <div key={stat.label} className="text-center">
-              <p className="text-3xl md:text-4xl font-extrabold text-highlight mb-1">
+              <p className="text-3xl md:text-4xl font-extrabold text-gradient mb-1">
                 {stat.value}
               </p>
-              <p className="text-sm text-muted-foreground">{stat.label}</p>
+              <p className="text-sm text-muted-foreground font-medium">{stat.label}</p>
             </div>
           ))}
         </motion.div>

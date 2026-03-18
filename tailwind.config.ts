@@ -9,12 +9,12 @@ export default {
       center: true,
       padding: "2rem",
       screens: {
-        "2xl": "1400px",
+        "2xl": "1280px",
       },
     },
     extend: {
       fontFamily: {
-        sans: ["'Plus Jakarta Sans'", "system-ui", "sans-serif"],
+        sans: ["'Inter'", "system-ui", "sans-serif"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -71,6 +71,7 @@ export default {
         sm: "calc(var(--radius) - 4px)",
         xl: "calc(var(--radius) + 4px)",
         "2xl": "calc(var(--radius) + 8px)",
+        "3xl": "1.5rem",
       },
       keyframes: {
         "accordion-down": {
@@ -107,9 +108,10 @@ export default {
         shimmer: "shimmer 8s ease-in-out infinite",
       },
       boxShadow: {
-        glow: "0 0 40px hsl(217, 100%, 71%, 0.3)",
-        card: "0 4px 24px -4px hsl(222, 47%, 8%, 0.08)",
-        "card-hover": "0 8px 32px -4px hsl(222, 47%, 8%, 0.12)",
+        glow: "0 0 40px hsl(239, 84%, 67%, 0.2)",
+        card: "0 1px 3px hsl(224, 76%, 33%, 0.04), 0 4px 16px -2px hsl(224, 76%, 33%, 0.06)",
+        "card-hover": "0 8px 32px -4px hsl(224, 76%, 33%, 0.1)",
+        cta: "0 4px 14px 0 hsl(142, 71%, 45%, 0.35)",
       },
     },
   },

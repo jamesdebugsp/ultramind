@@ -1,70 +1,47 @@
 import { motion } from "framer-motion";
 import { 
-  Clock, 
-  Bell, 
-  Users, 
-  BarChart3, 
-  Globe, 
   MessageSquare,
-  QrCode,
-  Smartphone
+  CalendarCheck,
+  Zap,
+  TrendingUp
 } from "lucide-react";
 
 const features = [
   {
-    icon: Globe,
-    title: "Página Pública de Agendamentos",
-    description: "Link exclusivo para seus clientes agendarem 24 horas por dia, 7 dias por semana.",
-  },
-  {
     icon: MessageSquare,
-    title: "Bot de WhatsApp Automático",
-    description: "Confirmações, lembretes e reagendamentos enviados automaticamente.",
+    title: "Responda clientes automaticamente",
+    description: "Bot inteligente no WhatsApp que responde, agenda e confirma sem você precisar fazer nada.",
   },
   {
-    icon: Bell,
-    title: "Lembretes Inteligentes",
-    description: "Notificações 24h e 1h antes do horário para reduzir faltas.",
+    icon: CalendarCheck,
+    title: "Agendamentos 24h por dia",
+    description: "Página pública com link exclusivo. Seus clientes agendam a qualquer hora, de qualquer lugar.",
   },
   {
-    icon: Users,
-    title: "Multi-profissionais",
-    description: "Gerencie a agenda de todos os profissionais do seu estabelecimento.",
+    icon: Zap,
+    title: "Integração com WhatsApp e Instagram",
+    description: "Conecte seus canais e centralize tudo. Confirmações e lembretes enviados automaticamente.",
   },
   {
-    icon: Clock,
-    title: "Horários Flexíveis",
-    description: "Configure horários de funcionamento e intervalos personalizados.",
-  },
-  {
-    icon: BarChart3,
-    title: "Dashboard Completo",
-    description: "Métricas de agendamentos, faltas e serviços mais populares.",
-  },
-  {
-    icon: QrCode,
-    title: "QR Code Exclusivo",
-    description: "Gere QR codes para divulgar sua página de agendamentos.",
-  },
-  {
-    icon: Smartphone,
-    title: "100% Mobile",
-    description: "Interface otimizada para celular, tanto para você quanto seus clientes.",
+    icon: TrendingUp,
+    title: "Aumente suas vendas sem esforço",
+    description: "Reduza faltas em 80%, preencha horários vagos e acompanhe tudo pelo dashboard.",
   },
 ];
 
 export function FeaturesSection() {
   return (
-    <section id="funcionalidades" className="py-24 bg-muted/30">
+    <section id="funcionalidades" className="py-28 bg-background">
       <div className="container px-4">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-16"
+          className="text-center mb-20"
         >
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+          <p className="text-sm font-semibold text-secondary uppercase tracking-widest mb-3">Benefícios</p>
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-foreground mb-5">
             Tudo que você precisa para{" "}
             <span className="text-gradient">crescer</span>
           </h2>
@@ -73,22 +50,22 @@ export function FeaturesSection() {
           </p>
         </motion.div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+        <div className="grid sm:grid-cols-2 gap-6 lg:gap-8 max-w-4xl mx-auto">
           {features.map((feature, index) => (
             <motion.div
               key={feature.title}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: index * 0.08 }}
+              transition={{ duration: 0.5, delay: index * 0.1 }}
               className="group"
             >
-              <div className="h-full bg-card rounded-xl p-6 border border-border shadow-sm hover:shadow-card hover:border-highlight/30 transition-all duration-300">
-                <div className="w-12 h-12 rounded-xl bg-highlight/10 text-highlight flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-                  <feature.icon className="w-6 h-6" />
+              <div className="h-full bg-card rounded-2xl p-8 border border-border shadow-card hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                <div className="w-14 h-14 rounded-2xl gradient-primary text-primary-foreground flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
+                  <feature.icon className="w-7 h-7" />
                 </div>
-                <h3 className="text-lg font-bold text-foreground mb-2">{feature.title}</h3>
-                <p className="text-sm text-muted-foreground">{feature.description}</p>
+                <h3 className="text-xl font-bold text-foreground mb-3">{feature.title}</h3>
+                <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
               </div>
             </motion.div>
           ))}
