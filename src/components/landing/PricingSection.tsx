@@ -17,7 +17,7 @@ const plans = [
     originalPrice: 89,
     savings: 40,
     description: "Perfeito para começar a automatizar",
-    cta: "Começar agora — Teste grátis 7 dias",
+    cta: "Começar agora — 7 dias grátis",
     features: [
       "Página pública de agendamentos",
       "Até 100 agendamentos/mês",
@@ -56,7 +56,7 @@ const plans = [
     originalPrice: 299,
     savings: 100,
     description: "Para quem quer dominar o mercado",
-    cta: "Quero o Master — Crescer Agora",
+    cta: "Quero o Master",
     features: [
       "Tudo do Profissional +",
       "Profissionais ilimitados",
@@ -75,7 +75,6 @@ export function PricingSection() {
   const navigate = useNavigate();
   const { user } = useAuth();
   
-  // Payment modal state
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'basic' | 'pro' | 'premium'>('basic');
   const [paymentAmount, setPaymentAmount] = useState(0);
@@ -83,24 +82,21 @@ export function PricingSection() {
 
   const handlePlanClick = (planId: 'basic' | 'pro' | 'premium', price: number, name: string) => {
     if (user) {
-      // User logged in - open payment modal directly
       setSelectedPlan(planId);
       setPaymentAmount(price);
       setPaymentDescription(`Plano ${name}`);
       setPaymentModalOpen(true);
     } else {
-      // User not logged in - redirect to signup
       navigate("/cadastro");
     }
   };
 
   const handlePaymentSuccess = () => {
-    // Redirect to dashboard after successful payment
     navigate("/dashboard/planos");
   };
 
   return (
-    <section id="planos" className="py-24 bg-background">
+    <section id="planos" className="py-28 bg-background">
       <div className="container px-4">
         {/* Promo Banner */}
         <motion.div
@@ -109,9 +105,9 @@ export function PricingSection() {
           viewport={{ once: true }}
           className="max-w-3xl mx-auto mb-12"
         >
-          <div className="bg-gradient-to-r from-highlight/10 via-accent/10 to-highlight/10 border border-highlight/20 rounded-2xl p-4 text-center">
-            <p className="text-sm md:text-base font-semibold text-foreground">
-              🔥 <span className="text-highlight">Promoção válida para os primeiros 100 clientes</span> — após isso os preços voltam ao normal
+          <div className="gradient-primary rounded-2xl p-4 text-center">
+            <p className="text-sm md:text-base font-semibold text-primary-foreground">
+              🔥 Promoção válida para os primeiros 100 clientes — após isso os preços voltam ao normal
             </p>
           </div>
         </motion.div>
@@ -121,9 +117,10 @@ export function PricingSection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="text-center mb-16"
+          className="text-center mb-20"
         >
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+          <p className="text-sm font-semibold text-secondary uppercase tracking-widest mb-3">Planos</p>
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-foreground mb-5">
             Planos & Preços
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
@@ -131,7 +128,7 @@ export function PricingSection() {
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-6 lg:gap-8 max-w-5xl mx-auto">
           {plans.map((plan, index) => (
             <motion.div
               key={plan.name}
@@ -151,15 +148,15 @@ export function PricingSection() {
               
               <Card 
                 variant={plan.highlighted ? "highlight" : "elevated"}
-                className={`h-full flex flex-col ${plan.highlighted ? "scale-105" : ""}`}
+                className={`h-full flex flex-col rounded-2xl ${plan.highlighted ? "scale-105 border-secondary" : ""}`}
               >
                 <div className="p-8 flex-1 flex flex-col">
                   {/* Header */}
-                  <div className="flex items-center gap-3 mb-4">
+                  <div className="flex items-center gap-3 mb-6">
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                      plan.highlighted ? "gradient-accent" : "bg-muted"
+                      plan.highlighted ? "gradient-primary" : "bg-secondary/10"
                     }`}>
-                      <plan.icon className={`w-6 h-6 ${plan.highlighted ? "text-primary-foreground" : "text-foreground"}`} />
+                      <plan.icon className={`w-6 h-6 ${plan.highlighted ? "text-primary-foreground" : "text-secondary"}`} />
                     </div>
                     <div>
                       <h3 className="text-xl font-bold text-foreground">{plan.name}</h3>
@@ -168,7 +165,7 @@ export function PricingSection() {
                   </div>
 
                   {/* Pricing */}
-                  <div className="mb-6">
+                  <div className="mb-8">
                     <div className="flex items-baseline gap-2">
                       <span className="text-4xl font-extrabold text-foreground">
                         R${plan.price}
@@ -186,7 +183,7 @@ export function PricingSection() {
                   </div>
 
                   {/* Features */}
-                  <ul className="space-y-3 mb-8 flex-1">
+                  <ul className="space-y-3.5 mb-8 flex-1">
                     {plan.features.map((feature) => (
                       <li key={feature} className="flex items-start gap-3">
                         <Check className="w-5 h-5 text-highlight shrink-0 mt-0.5" />
@@ -197,7 +194,7 @@ export function PricingSection() {
 
                   {/* CTA */}
                   <Button 
-                    variant={plan.highlighted ? "hero" : "outline"} 
+                    variant={plan.highlighted ? "highlight" : "outline"} 
                     size="lg" 
                     className="w-full cursor-pointer"
                     onClick={() => handlePlanClick(plan.id, plan.price, plan.name)}

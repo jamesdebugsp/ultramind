@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 
 const navLinks = [
   { label: "Como funciona", href: "#como-funciona" },
-  { label: "Funcionalidades", href: "#funcionalidades" },
+  { label: "Benefícios", href: "#funcionalidades" },
   { label: "Planos", href: "#planos" },
   { label: "Depoimentos", href: "#depoimentos" },
   { label: "FAQ", href: "#faq" },
@@ -40,13 +40,13 @@ export function Navbar() {
       >
         <nav className="container px-4 h-16 md:h-20 flex items-center justify-between">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg gradient-accent flex items-center justify-center">
+          <Link to="/" className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center">
               <Calendar className="w-5 h-5 text-primary-foreground" />
             </div>
             <div className="hidden sm:block">
-              <span className="font-bold text-foreground">AgendePro</span>
-              <p className="text-[10px] text-muted-foreground -mt-1">by UltraMind</p>
+              <span className="font-bold text-foreground text-lg tracking-tight">AgendePro</span>
+              <p className="text-[10px] text-muted-foreground -mt-0.5">by UltraMind</p>
             </div>
           </Link>
 
@@ -100,7 +100,7 @@ export function Navbar() {
                       key={link.label}
                       href={link.href}
                       onClick={() => setIsMobileMenuOpen(false)}
-                      className="block py-3 text-lg font-medium text-foreground hover:text-highlight transition-colors"
+                      className="block py-3 text-lg font-medium text-foreground hover:text-secondary transition-colors"
                     >
                       {link.label}
                     </a>
