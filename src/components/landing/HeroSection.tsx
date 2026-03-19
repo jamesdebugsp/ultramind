@@ -7,11 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 export function HeroSection() {
   const { user } = useAuth();
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden gradient-hero pt-20">
-      {/* Subtle grid pattern */}
-      <div className="absolute inset-0 opacity-[0.03]" style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%231E3A8A' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-      }} />
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden gradient-hero pt-24">
 
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden">
@@ -19,7 +15,7 @@ export function HeroSection() {
         <div className="absolute bottom-1/4 -right-32 w-[500px] h-[500px] bg-primary/5 rounded-full blur-3xl" />
       </div>
 
-      <div className="container relative z-10 px-4 py-16 md:py-24">
+      <div className="container relative z-10 px-4 py-20 md:py-32">
         <div className="max-w-5xl mx-auto">
           {/* Two column layout on desktop */}
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
@@ -34,28 +30,28 @@ export function HeroSection() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2, duration: 0.5 }}
-                className="inline-flex items-center gap-2 px-3 py-1.5 bg-highlight/10 border border-highlight/20 rounded-full text-sm text-highlight font-medium mb-6"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-highlight/10 border border-highlight/20 rounded-full text-sm text-highlight font-medium mb-8"
               >
-                <div className="flex -space-x-1">
+                <div className="flex -space-x-0.5">
                   {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-3.5 h-3.5 fill-highlight text-highlight" />
+                    <Star key={i} className="w-4 h-4 fill-highlight text-highlight" />
                   ))}
                 </div>
-                <span>Avaliado por 120+ empresas</span>
+                <span>Nota 4.9 · Usado por 120+ empresas</span>
               </motion.div>
 
-              <h1 className="text-4xl md:text-5xl lg:text-[3.5rem] font-extrabold text-foreground leading-[1.1] tracking-tight mb-6">
+              <h1 className="text-4xl md:text-5xl lg:text-[3.5rem] font-extrabold text-foreground leading-[1.08] tracking-tight mb-7">
                 Pare de perder clientes no{" "}
-                <span className="text-gradient">WhatsApp.</span>
+                <span className="text-gradient">WhatsApp</span> todos os dias.
               </h1>
 
-              <p className="text-lg md:text-xl text-muted-foreground leading-relaxed mb-8 max-w-lg">
-                Automatize seus agendamentos e transforme conversas em vendas todos os dias, sem esforço.
+              <p className="text-lg md:text-xl text-muted-foreground leading-relaxed mb-10 max-w-lg">
+                Responda automaticamente, agende clientes e aumente suas vendas sem precisar atender manualmente.
               </p>
 
               {/* CTA Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                <Button variant="hero" size="xl" asChild>
+              <div className="flex flex-col sm:flex-row gap-4 mb-5">
+                <Button variant="highlight" size="xl" className="shadow-cta" asChild>
                   <Link to={user ? "/dashboard/planos" : "/cadastro"}>
                     Começar agora grátis
                     <ArrowRight className="w-5 h-5 ml-1" />
@@ -67,8 +63,8 @@ export function HeroSection() {
               </div>
 
               {/* Microcopy */}
-              <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Clock className="w-3.5 h-3.5" />
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock className="w-4 h-4" />
                 Leva menos de 2 minutos · Sem cartão de crédito
               </p>
             </motion.div>
@@ -98,7 +94,7 @@ export function HeroSection() {
                   </div>
 
                   {/* Chat messages */}
-                  <div className="p-4 space-y-3 bg-muted/30 min-h-[320px]">
+                  <div className="p-4 space-y-4 bg-muted/30 min-h-[340px]">
                     {/* User message */}
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
@@ -185,12 +181,12 @@ export function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1, duration: 0.6 }}
-          className="mt-20 max-w-4xl mx-auto"
+          className="mt-24 max-w-4xl mx-auto"
         >
-          <p className="text-center text-sm text-muted-foreground mb-6 font-medium">
-            Mais de 120 empresas já automatizam seus atendimentos com o AgendePro
+          <p className="text-center text-sm text-muted-foreground mb-8 font-medium uppercase tracking-widest">
+            Empresas que já automatizam com o AgendePro
           </p>
-          <div className="flex flex-wrap justify-center items-center gap-8 md:gap-12 opacity-40">
+          <div className="flex flex-wrap justify-center items-center gap-10 md:gap-14 opacity-30">
             {["StudioBella", "BarberKing", "PetCare+", "SalãoVIP", "ClinicDerma", "NailArt"].map((name) => (
               <span key={name} className="text-lg font-bold text-foreground tracking-tight">{name}</span>
             ))}
