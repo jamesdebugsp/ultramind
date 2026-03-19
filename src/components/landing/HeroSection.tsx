@@ -40,13 +40,13 @@ export function HeroSection() {
                 <span>Nota 4.9 · Usado por 120+ empresas</span>
               </motion.div>
 
-              <h1 className="text-4xl md:text-5xl lg:text-[3.5rem] font-extrabold text-foreground leading-[1.1] tracking-tight mb-6">
+              <h1 className="text-4xl md:text-5xl lg:text-[3.5rem] font-extrabold text-foreground leading-[1.08] tracking-tight mb-7">
                 Pare de perder clientes no{" "}
-                <span className="text-gradient">WhatsApp.</span>
+                <span className="text-gradient">WhatsApp</span> todos os dias.
               </h1>
 
-              <p className="text-lg md:text-xl text-muted-foreground leading-relaxed mb-8 max-w-lg">
-                Automatize seus agendamentos e transforme conversas em vendas todos os dias, sem esforço.
+              <p className="text-lg md:text-xl text-muted-foreground leading-relaxed mb-10 max-w-lg">
+                Responda automaticamente, agende clientes e aumente suas vendas sem precisar atender manualmente.
               </p>
 
               {/* CTA Buttons */}
