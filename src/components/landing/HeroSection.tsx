@@ -181,12 +181,12 @@ export function HeroSection() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1, duration: 0.6 }}
-          className="mt-20 max-w-4xl mx-auto"
+          className="mt-24 max-w-4xl mx-auto"
         >
-          <p className="text-center text-sm text-muted-foreground mb-6 font-medium">
-            Mais de 120 empresas já automatizam seus atendimentos com o AgendePro
+          <p className="text-center text-sm text-muted-foreground mb-8 font-medium uppercase tracking-widest">
+            Empresas que já automatizam com o AgendePro
           </p>
-          <div className="flex flex-wrap justify-center items-center gap-8 md:gap-12 opacity-40">
+          <div className="flex flex-wrap justify-center items-center gap-10 md:gap-14 opacity-30">
             {["StudioBella", "BarberKing", "PetCare+", "SalãoVIP", "ClinicDerma", "NailArt"].map((name) => (
               <span key={name} className="text-lg font-bold text-foreground tracking-tight">{name}</span>
             ))}
