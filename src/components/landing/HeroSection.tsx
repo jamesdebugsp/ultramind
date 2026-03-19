@@ -15,7 +15,7 @@ export function HeroSection() {
         <div className="absolute bottom-1/4 -right-32 w-[500px] h-[500px] bg-primary/5 rounded-full blur-3xl" />
       </div>
 
-      <div className="container relative z-10 px-4 py-16 md:py-24">
+      <div className="container relative z-10 px-4 py-20 md:py-32">
         <div className="max-w-5xl mx-auto">
           {/* Two column layout on desktop */}
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
