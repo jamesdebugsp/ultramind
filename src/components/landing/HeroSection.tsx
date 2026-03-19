@@ -50,8 +50,8 @@ export function HeroSection() {
               </p>
 
               {/* CTA Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                <Button variant="hero" size="xl" asChild>
+              <div className="flex flex-col sm:flex-row gap-4 mb-5">
+                <Button variant="highlight" size="xl" className="shadow-cta" asChild>
                   <Link to={user ? "/dashboard/planos" : "/cadastro"}>
                     Começar agora grátis
                     <ArrowRight className="w-5 h-5 ml-1" />
@@ -63,8 +63,8 @@ export function HeroSection() {
               </div>
 
               {/* Microcopy */}
-              <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Clock className="w-3.5 h-3.5" />
+              <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock className="w-4 h-4" />
                 Leva menos de 2 minutos · Sem cartão de crédito
               </p>
             </motion.div>
