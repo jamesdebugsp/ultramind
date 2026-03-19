@@ -94,7 +94,7 @@ export function HeroSection() {
                   </div>
 
                   {/* Chat messages */}
-                  <div className="p-4 space-y-3 bg-muted/30 min-h-[320px]">
+                  <div className="p-4 space-y-4 bg-muted/30 min-h-[340px]">
                     {/* User message */}
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
