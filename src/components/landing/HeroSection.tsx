@@ -30,14 +30,14 @@ export function HeroSection() {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2, duration: 0.5 }}
-                className="inline-flex items-center gap-2 px-3 py-1.5 bg-highlight/10 border border-highlight/20 rounded-full text-sm text-highlight font-medium mb-6"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-highlight/10 border border-highlight/20 rounded-full text-sm text-highlight font-medium mb-8"
               >
-                <div className="flex -space-x-1">
+                <div className="flex -space-x-0.5">
                   {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-3.5 h-3.5 fill-highlight text-highlight" />
+                    <Star key={i} className="w-4 h-4 fill-highlight text-highlight" />
                   ))}
                 </div>
-                <span>Avaliado por 120+ empresas</span>
+                <span>Nota 4.9 · Usado por 120+ empresas</span>
               </motion.div>
 
               <h1 className="text-4xl md:text-5xl lg:text-[3.5rem] font-extrabold text-foreground leading-[1.1] tracking-tight mb-6">
