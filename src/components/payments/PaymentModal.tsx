@@ -22,6 +22,7 @@ import {
   Clock,
   ExternalLink,
   AlertTriangle,
+  ShoppingCart,
 } from 'lucide-react';
 import { usePayments, CreatePaymentRequest, CreatePaymentResponse } from '@/hooks/usePayments';
 import { useToast } from '@/hooks/use-toast';
