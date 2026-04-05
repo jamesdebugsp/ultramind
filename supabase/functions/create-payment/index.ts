@@ -9,47 +9,93 @@ const corsHeaders = {
 interface CreatePaymentRequest {
   type: "plan" | "credits";
   plan?: "basic" | "pro" | "premium";
-  credits_package?: string; // pack_300, pack_800, pack_2000
-  payment_method: "pix" | "credit_card" | "boleto";
-  card_token?: string; // For credit card payments
+  credits_package?: string;
+  payment_method: "pix" | "credit_card" | "boleto" | "checkout_pro";
+  card_token?: string;
   installments?: number;
   payer_email?: string;
   payer_name?: string;
   payer_cpf?: string;
 }
 
-// Plan prices and credits
-const PLAN_PRICES: Record<string, { price: number; credits: number }> = {
-  basic: { price: 49, credits: 0 },
-  pro: { price: 99, credits: 600 },
-  premium: { price: 199, credits: 2500 },
+const PLAN_PRICES: Record<string, { price: number; credits: number; name: string }> = {
+  basic: { price: 49, credits: 0, name: "Essencial" },
+  pro: { price: 99, credits: 600, name: "Profissional" },
+  premium: { price: 199, credits: 2500, name: "Master" },
 };
 
-// Credit packages
 const CREDIT_PACKAGES: Record<string, { credits: number; price: number }> = {
   pack_300: { credits: 300, price: 29 },
   pack_800: { credits: 800, price: 59 },
   pack_2000: { credits: 2000, price: 119 },
 };
 
-async function createMercadoPagoPayment(
+// Checkout Pro: creates a preference and returns init_point URL
+async function createCheckoutProPreference(
+  accessToken: string,
+  amount: number,
+  description: string,
+  externalReference: string,
+  payerEmail: string,
+  notificationUrl: string,
+  backUrls: { success: string; failure: string; pending: string }
+) {
+  const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      items: [
+        {
+          title: description,
+          quantity: 1,
+          unit_price: amount,
+          currency_id: "BRL",
+        },
+      ],
+      payer: { email: payerEmail },
+      payment_methods: {
+        installments: 12,
+        excluded_payment_types: [],
+      },
+      external_reference: externalReference,
+      notification_url: notificationUrl,
+      back_urls: backUrls,
+      auto_return: "approved",
+      statement_descriptor: "UltraMind SaaS",
+    }),
+  });
+
+  const data = await response.json();
+  console.log("Checkout Pro preference response:", JSON.stringify(data, null, 2));
+
+  if (!response.ok) {
+    throw new Error(`Checkout Pro error: ${data.message || JSON.stringify(data)}`);
+  }
+
+  return data;
+}
+
+// Direct payment via /v1/payments (PIX, boleto, credit_card)
+async function createDirectPayment(
   accessToken: string,
   amount: number,
   description: string,
   paymentMethod: string,
   externalReference: string,
   payer: { email: string; first_name?: string; identification?: { type: string; number: string } },
+  notificationUrl: string,
   cardToken?: string,
   installments?: number
 ) {
-  const baseUrl = "https://api.mercadopago.com/v1/payments";
-
-  let paymentData: Record<string, unknown> = {
+  const paymentData: Record<string, unknown> = {
     transaction_amount: amount,
     description,
     external_reference: externalReference,
     payer,
-    notification_url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/payment-webhook`,
+    notification_url: notificationUrl,
   };
 
   if (paymentMethod === "pix") {
@@ -60,12 +106,12 @@ async function createMercadoPagoPayment(
     paymentData.payment_method_id = "credit_card";
   } else if (paymentMethod === "boleto") {
     paymentData.payment_method_id = "bolbradesco";
-    paymentData.date_of_expiration = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(); // 3 days
+    paymentData.date_of_expiration = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
   }
 
-  console.log("Creating Mercado Pago payment:", JSON.stringify(paymentData, null, 2));
+  console.log("Creating direct payment:", JSON.stringify(paymentData, null, 2));
 
-  const response = await fetch(baseUrl, {
+  const response = await fetch("https://api.mercadopago.com/v1/payments", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -76,7 +122,7 @@ async function createMercadoPagoPayment(
   });
 
   const data = await response.json();
-  console.log("Mercado Pago response:", JSON.stringify(data, null, 2));
+  console.log("Direct payment response:", JSON.stringify(data, null, 2));
 
   if (!response.ok) {
     throw new Error(`Mercado Pago error: ${data.message || JSON.stringify(data)}`);
@@ -96,30 +142,25 @@ serve(async (req) => {
       throw new Error("MERCADOPAGO_ACCESS_TOKEN not configured");
     }
 
-    // Get authorization header
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       throw new Error("Authorization header required");
     }
 
-    // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    // Get authenticated user
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       throw new Error("User not authenticated");
     }
 
-    // Parse request
     const body: CreatePaymentRequest = await req.json();
     console.log("Payment request:", JSON.stringify(body, null, 2));
 
-    // Validate request
     if (!body.type || !body.payment_method) {
       throw new Error("Missing required fields: type, payment_method");
     }
@@ -135,7 +176,7 @@ serve(async (req) => {
       }
       amount = PLAN_PRICES[body.plan].price;
       planName = body.plan;
-      description = `UltraMind Solutions - Plano ${body.plan.charAt(0).toUpperCase() + body.plan.slice(1)}`;
+      description = `UltraMind Solutions - Plano ${PLAN_PRICES[body.plan].name}`;
     } else if (body.type === "credits") {
       if (!body.credits_package || !CREDIT_PACKAGES[body.credits_package]) {
         throw new Error("Invalid credits package");
@@ -148,9 +189,9 @@ serve(async (req) => {
       throw new Error("Invalid payment type");
     }
 
-    // Create payment record in database
     const externalReference = `ultramind_${user.id}_${Date.now()}`;
-    
+    const notificationUrl = `${supabaseUrl}/functions/v1/payment-webhook`;
+
     const supabaseAdmin = createClient(
       supabaseUrl,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -164,7 +205,7 @@ serve(async (req) => {
         plan: planName,
         credits_amount: creditsAmount,
         amount,
-        payment_method: body.payment_method,
+        payment_method: body.payment_method === "checkout_pro" ? "checkout_pro" : body.payment_method,
         external_reference: externalReference,
         status: "pending",
       })
@@ -176,41 +217,74 @@ serve(async (req) => {
       throw new Error("Failed to create payment record");
     }
 
-    // Build payer object
+    // --- CHECKOUT PRO FLOW ---
+    if (body.payment_method === "checkout_pro") {
+      // Determine back URLs based on origin or fallback
+      const origin = req.headers.get("origin") || "https://ultramind.lovable.app";
+      const backUrls = {
+        success: `${origin}/dashboard/planos?payment=success&id=${paymentRecord.id}`,
+        failure: `${origin}/dashboard/planos?payment=failure&id=${paymentRecord.id}`,
+        pending: `${origin}/dashboard/planos?payment=pending&id=${paymentRecord.id}`,
+      };
+
+      const preference = await createCheckoutProPreference(
+        accessToken,
+        amount,
+        description,
+        externalReference,
+        body.payer_email || user.email || "cliente@ultramind.app",
+        notificationUrl,
+        backUrls
+      );
+
+      // Update payment with preference ID
+      await supabaseAdmin
+        .from("payments")
+        .update({
+          external_id: preference.id,
+          metadata: { checkout_pro: true, init_point: preference.init_point },
+        })
+        .eq("id", paymentRecord.id);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          payment_id: paymentRecord.id,
+          external_id: preference.id,
+          status: "pending",
+          checkout_url: preference.init_point,
+          sandbox_checkout_url: preference.sandbox_init_point,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // --- DIRECT PAYMENT FLOW (PIX, Card, Boleto) ---
     const payer: { email: string; first_name?: string; identification?: { type: string; number: string } } = {
       email: body.payer_email || user.email || "cliente@ultramind.app",
     };
-    
-    if (body.payer_name) {
-      payer.first_name = body.payer_name;
-    }
-    
+    if (body.payer_name) payer.first_name = body.payer_name;
     if (body.payer_cpf) {
-      payer.identification = {
-        type: "CPF",
-        number: body.payer_cpf.replace(/\D/g, ""),
-      };
+      payer.identification = { type: "CPF", number: body.payer_cpf.replace(/\D/g, "") };
     }
 
-    // Create payment in Mercado Pago
-    const mpPayment = await createMercadoPagoPayment(
+    const mpPayment = await createDirectPayment(
       accessToken,
       amount,
       description,
       body.payment_method,
       externalReference,
       payer,
+      notificationUrl,
       body.card_token,
       body.installments
     );
 
-    // Update payment record with Mercado Pago data
     const updateData: Record<string, unknown> = {
       external_id: mpPayment.id.toString(),
       status: mpPayment.status,
     };
 
-    // Handle different payment methods
     if (body.payment_method === "pix" && mpPayment.point_of_interaction?.transaction_data) {
       const txData = mpPayment.point_of_interaction.transaction_data;
       updateData.pix_qr_code = txData.qr_code;
@@ -230,26 +304,16 @@ serve(async (req) => {
       updateData.installments = body.installments || 1;
     }
 
-    // If payment is already approved (instant approval)
     if (mpPayment.status === "approved") {
       updateData.paid_at = new Date().toISOString();
     }
 
-    const { error: updateError } = await supabaseAdmin
-      .from("payments")
-      .update(updateData)
-      .eq("id", paymentRecord.id);
+    await supabaseAdmin.from("payments").update(updateData).eq("id", paymentRecord.id);
 
-    if (updateError) {
-      console.error("Error updating payment:", updateError);
-    }
-
-    // Process if already approved
     if (mpPayment.status === "approved") {
       await supabaseAdmin.rpc("process_approved_payment", { p_payment_id: paymentRecord.id });
     }
 
-    // Prepare response
     const response: Record<string, unknown> = {
       success: true,
       payment_id: paymentRecord.id,
@@ -280,10 +344,7 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { 
-        status: 400, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
-      }
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

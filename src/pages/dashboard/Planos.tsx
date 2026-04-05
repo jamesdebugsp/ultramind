@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Check,
   Crown,
@@ -83,6 +84,7 @@ const plans = [
 ];
 
 export default function Planos() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { subscription, loading, refetch: refetchSubscription } = useSubscription();
   const { creditInfo, loading: creditsLoading, getUsagePercentage, packages, refetch: refetchCredits } = useCredits();
   
@@ -93,6 +95,20 @@ export default function Planos() {
   const [selectedPackage, setSelectedPackage] = useState<'pack_300' | 'pack_800' | 'pack_2000'>('pack_300');
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentDescription, setPaymentDescription] = useState('');
+  const [checkoutReturnStatus, setCheckoutReturnStatus] = useState<string | null>(null);
+
+  // Handle Checkout Pro return
+  useEffect(() => {
+    const paymentStatus = searchParams.get('payment');
+    if (paymentStatus) {
+      setCheckoutReturnStatus(paymentStatus);
+      // Refresh data
+      refetchSubscription();
+      refetchCredits();
+      // Clean URL
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams, refetchSubscription, refetchCredits]);
 
   const handleSelectPlan = (plan: SubscriptionPlan) => {
     if (subscription?.plan === plan) return;
@@ -147,6 +163,37 @@ export default function Planos() {
   return (
     <DashboardLayout>
       <div className="p-4 lg:p-8">
+        {/* Checkout Pro Return Banner */}
+        {checkoutReturnStatus === 'success' && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-center"
+          >
+            <p className="text-lg font-semibold text-emerald-600">🎉 Pagamento confirmado!</p>
+            <p className="text-sm text-muted-foreground mt-1">Seu plano foi ativado automaticamente.</p>
+          </motion.div>
+        )}
+        {checkoutReturnStatus === 'pending' && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 text-center"
+          >
+            <p className="text-lg font-semibold text-amber-600">⏳ Pagamento pendente</p>
+            <p className="text-sm text-muted-foreground mt-1">Seu pagamento está sendo processado. O plano será ativado automaticamente.</p>
+          </motion.div>
+        )}
+        {checkoutReturnStatus === 'failure' && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-center"
+          >
+            <p className="text-lg font-semibold text-destructive">❌ Pagamento não aprovado</p>
+            <p className="text-sm text-muted-foreground mt-1">Tente novamente ou escolha outra forma de pagamento.</p>
+          </motion.div>
+        )}
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}

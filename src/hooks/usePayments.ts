@@ -34,7 +34,7 @@ export interface CreatePaymentRequest {
   type: 'plan' | 'credits';
   plan?: 'basic' | 'pro' | 'premium';
   credits_package?: 'pack_300' | 'pack_800' | 'pack_2000';
-  payment_method: 'pix' | 'credit_card' | 'boleto';
+  payment_method: 'pix' | 'credit_card' | 'boleto' | 'checkout_pro';
   card_token?: string;
   installments?: number;
   payer_email?: string;
@@ -58,6 +58,8 @@ export interface CreatePaymentResponse {
     barcode: string;
     expires_at: string;
   };
+  checkout_url?: string;
+  sandbox_checkout_url?: string;
   error?: string;
 }
 
