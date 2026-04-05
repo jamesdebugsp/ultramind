@@ -84,6 +84,7 @@ const plans = [
 ];
 
 export default function Planos() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { subscription, loading, refetch: refetchSubscription } = useSubscription();
   const { creditInfo, loading: creditsLoading, getUsagePercentage, packages, refetch: refetchCredits } = useCredits();
   
@@ -94,6 +95,20 @@ export default function Planos() {
   const [selectedPackage, setSelectedPackage] = useState<'pack_300' | 'pack_800' | 'pack_2000'>('pack_300');
   const [paymentAmount, setPaymentAmount] = useState(0);
   const [paymentDescription, setPaymentDescription] = useState('');
+  const [checkoutReturnStatus, setCheckoutReturnStatus] = useState<string | null>(null);
+
+  // Handle Checkout Pro return
+  useEffect(() => {
+    const paymentStatus = searchParams.get('payment');
+    if (paymentStatus) {
+      setCheckoutReturnStatus(paymentStatus);
+      // Refresh data
+      refetchSubscription();
+      refetchCredits();
+      // Clean URL
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams, refetchSubscription, refetchCredits]);
 
   const handleSelectPlan = (plan: SubscriptionPlan) => {
     if (subscription?.plan === plan) return;
