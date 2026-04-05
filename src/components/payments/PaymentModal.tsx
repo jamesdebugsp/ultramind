@@ -84,9 +84,43 @@ export function PaymentModal({
     }
   }, [open]);
 
-  const handleSelectMethod = (method: 'pix' | 'credit_card' | 'boleto') => {
+  const handleSelectMethod = (method: 'pix' | 'credit_card' | 'boleto' | 'checkout_pro') => {
     setPaymentMethod(method);
+    if (method === 'checkout_pro') {
+      // Skip form, go directly to checkout
+      handleCheckoutPro();
+      return;
+    }
     setStep('form');
+  };
+
+  const handleCheckoutPro = async () => {
+    const request: CreatePaymentRequest = {
+      type,
+      payment_method: 'checkout_pro',
+      payer_email: undefined,
+    };
+    if (type === 'plan' && plan) request.plan = plan;
+    else if (type === 'credits' && creditsPackage) request.credits_package = creditsPackage;
+
+    setStep('form'); // Show loading state
+    const result = await createPayment(request);
+    if (result?.checkout_url) {
+      window.open(result.checkout_url, '_blank');
+      setStep('pending');
+      // Poll for status
+      pollPaymentStatus(result.payment_id, (status) => {
+        if (status === 'approved') {
+          setStep('success');
+          onSuccess?.();
+          toast({ title: 'Pagamento confirmado!', description: 'Seu pagamento foi processado com sucesso.' });
+        } else if (status === 'rejected' || status === 'cancelled') {
+          setStep('error');
+        }
+      });
+    } else {
+      setStep('error');
+    }
   };
 
   const handleSubmit = async () => {
