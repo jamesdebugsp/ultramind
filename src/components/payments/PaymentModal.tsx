@@ -64,7 +64,7 @@ export function PaymentModal({
   const { toast } = useToast();
   
   const [step, setStep] = useState<'method' | 'form' | 'pending' | 'success' | 'error'>('method');
-  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'credit_card' | 'boleto'>('pix');
+  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'credit_card' | 'boleto' | 'checkout_pro'>('pix');
   const [paymentData, setPaymentData] = useState<CreatePaymentResponse | null>(null);
   const [copied, setCopied] = useState(false);
   
