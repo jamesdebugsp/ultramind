@@ -163,6 +163,37 @@ export default function Planos() {
   return (
     <DashboardLayout>
       <div className="p-4 lg:p-8">
+        {/* Checkout Pro Return Banner */}
+        {checkoutReturnStatus === 'success' && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-center"
+          >
+            <p className="text-lg font-semibold text-emerald-600">🎉 Pagamento confirmado!</p>
+            <p className="text-sm text-muted-foreground mt-1">Seu plano foi ativado automaticamente.</p>
+          </motion.div>
+        )}
+        {checkoutReturnStatus === 'pending' && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 rounded-lg bg-amber-500/10 border border-amber-500/20 text-center"
+          >
+            <p className="text-lg font-semibold text-amber-600">⏳ Pagamento pendente</p>
+            <p className="text-sm text-muted-foreground mt-1">Seu pagamento está sendo processado. O plano será ativado automaticamente.</p>
+          </motion.div>
+        )}
+        {checkoutReturnStatus === 'failure' && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-center"
+          >
+            <p className="text-lg font-semibold text-destructive">❌ Pagamento não aprovado</p>
+            <p className="text-sm text-muted-foreground mt-1">Tente novamente ou escolha outra forma de pagamento.</p>
+          </motion.div>
+        )}
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
